@@ -15,6 +15,12 @@
 
 ---
 
+## Harvest Lane 3D
+
+The same game rebuilt in 3D with Three.js: a low-poly farm, walk-over harvesting (step on a ripe crop to collect it), and the full loop of stall, customers, animals, missions, upgrades and saves. It also carries optional rewarded offers on the currency pills inside YouTube Playables.
+
+**[▶ Play Harvest Lane 3D](https://yashdashrath18.github.io/harvest-lane/3d/)**
+
 ## About
 
 Harvest Lane is a complete, self-contained farming and market tycoon that runs entirely in the browser. You manage a small farm built around one loop: grow crops, carry the harvest to your market stall, and serve the queue of customers before their patience runs out. Coins earned at the stall fund upgrades and a second field, while chickens and cows turn your farm into a small production economy of eggs and milk.
