@@ -3,14 +3,14 @@ import { joystickVector, type JoystickVector } from '../utils/MathUtils';
 
 const RADIUS = 55;
 const ENGAGE_DISTANCE = 10;
-const HUD_BAR_HEIGHT = 72;
-// The on-screen action buttons live in the bottom corners of the
-// HUD (design coordinates): HARVEST bottom-right, SHOP and TASKS
-// bottom-left. Presses there belong to the buttons, not the joystick,
-// in the same way as presses on the top bar.
+const HUD_BAR_HEIGHT = 84;
+// The HUD furniture (design coordinates): HARVEST bottom-right; the
+// avatar, settings and shop medallions down the left edge; the
+// missions clipboard on the right edge. Presses there belong to the
+// buttons, not the joystick, like presses on the top bar.
 const BUTTON_ZONE = { minX: 396, minY: 726 };
-const LEFT_BUTTON_ZONE = { maxX: 144, minY: 640 };
-const GEAR_ZONE = { minX: 472, minY: 56, maxY: 128 };
+const LEFT_COLUMN_ZONE = { maxX: 96, maxY: 248 };
+const MISSION_ZONE = { minX: 444, minY: 104, maxY: 216 };
 
 /**
  * Floating virtual joystick. It appears where the player's finger or
@@ -56,8 +56,8 @@ export class VirtualJoystick {
       if (
         pointer.y <= HUD_BAR_HEIGHT ||
         (pointer.x >= BUTTON_ZONE.minX && pointer.y >= BUTTON_ZONE.minY) ||
-        (pointer.x <= LEFT_BUTTON_ZONE.maxX && pointer.y >= LEFT_BUTTON_ZONE.minY) ||
-        (pointer.x >= GEAR_ZONE.minX && pointer.y >= GEAR_ZONE.minY && pointer.y <= GEAR_ZONE.maxY)
+        (pointer.x <= LEFT_COLUMN_ZONE.maxX && pointer.y <= LEFT_COLUMN_ZONE.maxY) ||
+        (pointer.x >= MISSION_ZONE.minX && pointer.y >= MISSION_ZONE.minY && pointer.y <= MISSION_ZONE.maxY)
       ) {
         // Presses on the HUD bar or the action button zone are not
         // joystick presses, and must not later read as taps either.

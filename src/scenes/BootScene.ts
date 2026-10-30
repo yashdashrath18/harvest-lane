@@ -33,12 +33,144 @@ export class BootScene extends Phaser.Scene {
     this.makeCarrotTextures();
     this.makeAnimalTextures();
     this.makePolishTextures();
+    this.makeHudTextures();
     this.scene.start('Preload');
   }
 
+  /** HUD furniture in the reference style: farmer avatar medallion,
+   * clipboard for missions, red close button, gold star, cash stack. */
+  private makeHudTextures(): void {
+    // Avatar: cream medallion with the farmer's face and straw hat.
+    const av = this.add.graphics();
+    av.fillStyle(0xfff3d6, 1);
+    av.fillCircle(32, 32, 30);
+    av.lineStyle(4, 0x8a5a2b, 1);
+    av.strokeCircle(32, 32, 29);
+    av.fillStyle(0xd65347, 1);
+    av.fillRoundedRect(16, 44, 32, 16, 7);
+    av.fillStyle(0xf6c795, 1);
+    av.fillCircle(32, 33, 13);
+    av.fillStyle(0x333333, 1);
+    av.fillCircle(27, 33, 1.9);
+    av.fillCircle(37, 33, 1.9);
+    av.lineStyle(1.6, 0x9a5b3c, 1);
+    av.beginPath();
+    av.arc(32, 36, 5.5, 0.15 * Math.PI, 0.85 * Math.PI);
+    av.strokePath();
+    av.fillStyle(0xf0d060, 1);
+    av.fillEllipse(32, 22, 42, 9);
+    av.fillRoundedRect(21, 8, 22, 13, 5);
+    av.fillStyle(0xb5502f, 1);
+    av.fillRect(21, 17, 22, 4);
+    av.generateTexture('avatar', 64, 64);
+    av.destroy();
+
+    // Level star badge.
+    const star = this.add.graphics();
+    star.fillStyle(0xffc93c, 1);
+    star.lineStyle(2, 0xd9930d, 1);
+    const pts: Phaser.Types.Math.Vector2Like[] = [];
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 === 0 ? 13 : 6;
+      const a = -Math.PI / 2 + (i * Math.PI) / 5;
+      pts.push({ x: 14 + Math.cos(a) * r, y: 14 + Math.sin(a) * r });
+    }
+    star.fillPoints(pts, true);
+    star.strokePoints(pts, true);
+    star.generateTexture('icon-star', 28, 28);
+    star.destroy();
+
+    // Clipboard with checkmarks, the missions button.
+    const cb = this.add.graphics();
+    cb.fillStyle(0x8a5a2b, 1);
+    cb.fillRoundedRect(4, 6, 40, 50, 6);
+    cb.fillStyle(0xfff6de, 1);
+    cb.fillRoundedRect(8, 12, 32, 40, 4);
+    cb.fillStyle(0xc9cfd6, 1);
+    cb.fillRoundedRect(16, 2, 16, 10, 4);
+    cb.lineStyle(3, 0x57a639, 1);
+    [22, 32, 42].forEach((y) => {
+      cb.beginPath();
+      cb.moveTo(13, y);
+      cb.lineTo(17, y + 4);
+      cb.lineTo(24, y - 4);
+      cb.strokePath();
+    });
+    cb.generateTexture('icon-clipboard', 48, 58);
+    cb.destroy();
+
+    // Red round close button with a white cross.
+    const close = this.add.graphics();
+    close.fillStyle(0xe2483d, 1);
+    close.fillCircle(22, 22, 20);
+    close.fillStyle(0xc23327, 1);
+    close.fillEllipse(22, 30, 34, 18);
+    close.fillStyle(0xe2483d, 1);
+    close.fillCircle(22, 19, 19);
+    close.lineStyle(5, 0xffffff, 1);
+    close.beginPath();
+    close.moveTo(14, 14);
+    close.lineTo(30, 30);
+    close.moveTo(30, 14);
+    close.lineTo(14, 30);
+    close.strokePath();
+    close.generateTexture('btn-close', 44, 44);
+    close.destroy();
+
+    // Cash stack, the coins pill icon.
+    const cash = this.add.graphics();
+    cash.fillStyle(0x3f9e4d, 1);
+    cash.fillRoundedRect(3, 12, 26, 14, 2);
+    cash.fillStyle(0x57c46a, 1);
+    cash.fillRoundedRect(1, 7, 26, 14, 2);
+    cash.fillStyle(0x2f7d3c, 1);
+    cash.fillCircle(14, 14, 5);
+    cash.fillStyle(0xa8e6b0, 1);
+    cash.fillCircle(14, 14, 3);
+    cash.generateTexture('icon-cash', 30, 28);
+    cash.destroy();
+
+    // Backpack with an upgrade chevron, the shop button icon.
+    const bag = this.add.graphics();
+    bag.fillStyle(0x9a6a35, 1);
+    bag.fillRoundedRect(8, 14, 32, 30, 8);
+    bag.fillStyle(0x7c5225, 1);
+    bag.fillRoundedRect(8, 14, 32, 12, { tl: 8, tr: 8, bl: 0, br: 0 });
+    bag.fillStyle(0xc98f52, 1);
+    bag.fillRoundedRect(17, 24, 14, 12, 4);
+    bag.lineStyle(2, 0x5f3d16, 1);
+    bag.strokeRoundedRect(17, 24, 14, 12, 4);
+    bag.fillStyle(0x8a5a2b, 1);
+    bag.fillRect(12, 6, 6, 10);
+    bag.fillRect(30, 6, 6, 10);
+    bag.fillStyle(0x57b93c, 1);
+    bag.fillTriangle(41, 26, 47, 26, 44, 19);
+    bag.fillRect(42.5, 26, 3, 8);
+    bag.generateTexture('icon-bag', 48, 48);
+    bag.destroy();
+
+    // Wooden gear medallion for settings.
+    const med = this.add.graphics();
+    med.fillStyle(0xa9743f, 1);
+    med.fillCircle(26, 26, 24);
+    med.lineStyle(3, 0x7c4f24, 1);
+    med.strokeCircle(26, 26, 23);
+    med.fillStyle(0xfff3d6, 1);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      med.fillRect(26 + Math.cos(a) * 12 - 3, 26 + Math.sin(a) * 12 - 3, 7, 7);
+    }
+    med.fillCircle(26, 26, 10);
+    med.fillStyle(0xa9743f, 1);
+    med.fillCircle(26, 26, 4.5);
+    med.generateTexture('icon-gear-med', 52, 52);
+    med.destroy();
+  }
+
   private makeGrassTexture(): void {
+    // Bright, saturated lime grass in the casual-tycoon style.
     const g = this.add.graphics();
-    g.fillStyle(0x79c25f, 1);
+    g.fillStyle(0x95d64e, 1);
     g.fillRect(0, 0, 128, 128);
     // Deterministic speckles so tiling looks natural but stable.
     for (let i = 0; i < 90; i++) {
@@ -46,21 +178,34 @@ export class BootScene extends Phaser.Scene {
       const y = (Math.sin(i * 311.7) * 12543.1234) % 1;
       const px = Math.abs(x) * 128;
       const py = Math.abs(y) * 128;
-      g.fillStyle(i % 2 === 0 ? 0x6db354 : 0x86cd6c, 1);
+      g.fillStyle(i % 2 === 0 ? 0x84c93f : 0xa8e063, 1);
       g.fillRect(px, py, 5, 2);
+    }
+    // A few darker blade tufts for texture.
+    for (let i = 0; i < 14; i++) {
+      const px = Math.abs(Math.sin(i * 57.3) * 1000) % 124;
+      const py = Math.abs(Math.sin(i * 83.9) * 1000) % 124;
+      g.lineStyle(2, 0x74bb35, 1);
+      g.beginPath();
+      g.moveTo(px, py + 5);
+      g.lineTo(px + 1, py);
+      g.moveTo(px + 4, py + 5);
+      g.lineTo(px + 5, py + 1);
+      g.strokePath();
     }
     g.generateTexture('grass', 128, 128);
     g.destroy();
   }
 
   private makeDirtTexture(): void {
+    // Sandy path, lighter and warmer than the grass around it.
     const g = this.add.graphics();
-    g.fillStyle(0xd9a066, 1);
+    g.fillStyle(0xecc987, 1);
     g.fillRect(0, 0, 128, 128);
     for (let i = 0; i < 40; i++) {
       const px = Math.abs(Math.sin(i * 74.7) * 1000) % 120;
       const py = Math.abs(Math.sin(i * 51.3) * 1000) % 120;
-      g.fillStyle(i % 2 === 0 ? 0xc98f52 : 0xe5b478, 1);
+      g.fillStyle(i % 2 === 0 ? 0xdfb671 : 0xf5dca6, 1);
       g.fillEllipse(px, py, 10, 6);
     }
     g.generateTexture('dirt', 128, 128);
@@ -90,15 +235,17 @@ export class BootScene extends Phaser.Scene {
   }
 
   private makePlayerFrames(): void {
-    // Directional walk frames for the original farmer, 48x64 each:
-    // down, up and side (facing left; right is a runtime flip), two
+    // Directional walk frames for the original farmer, 56x76 each:
+    // bigger and rounder than the first pass, with shaded clothing
+    // and a wide straw hat, in the casual-tycoon proportion style.
+    // Down, up and side (facing left; right is a runtime flip), two
     // frames each with a leg and arm swing. Frame 0 doubles as idle.
     const dirs = ['down', 'up', 'side'] as const;
     dirs.forEach((dir) => {
       [0, 1].forEach((frame) => {
         const g = this.add.graphics();
         this.drawFarmer(g, dir, frame);
-        g.generateTexture(`player-${dir}-${frame}`, 48, 64);
+        g.generateTexture(`player-${dir}-${frame}`, 56, 76);
         g.destroy();
       });
     });
@@ -112,97 +259,110 @@ export class BootScene extends Phaser.Scene {
     const swing = frame === 0 ? 0 : 1;
     if (dir === 'side') {
       // Profile view facing left. Legs scissor between frames.
-      const frontLegX = swing ? 15 : 19;
-      const backLegX = swing ? 27 : 23;
-      g.fillStyle(0x4a3826, 1);
-      g.fillRoundedRect(frontLegX, 56, 9, 7, 2);
-      g.fillRoundedRect(backLegX, swing ? 53 : 56, 9, 7, 2);
-      g.fillStyle(0x3d5a80, 1);
-      g.fillRect(frontLegX + 1, 42, 8, 15);
-      g.fillRect(backLegX + 1, 42, 8, swing ? 12 : 15);
-      // Torso, narrower in profile
+      const frontLegX = swing ? 18 : 23;
+      const backLegX = swing ? 32 : 28;
+      g.fillStyle(0x5a4030, 1);
+      g.fillRoundedRect(frontLegX, 68, 11, 8, 3);
+      g.fillRoundedRect(backLegX, swing ? 65 : 68, 11, 8, 3);
+      g.fillStyle(0x46689c, 1);
+      g.fillRect(frontLegX + 1, 50, 10, 19);
+      g.fillRect(backLegX + 1, 50, 10, swing ? 16 : 19);
+      // Torso, narrower in profile, with a shaded back half
       g.fillStyle(0xc94f42, 1);
-      g.fillRoundedRect(15, 26, 19, 20, 6);
-      g.fillStyle(0x3d5a80, 1);
-      g.fillRect(17, 32, 9, 14);
+      g.fillRoundedRect(18, 32, 23, 24, 8);
+      g.fillStyle(0xa83e33, 1);
+      g.fillRoundedRect(32, 32, 9, 24, { tl: 0, tr: 8, bl: 0, br: 8 });
+      g.fillStyle(0x46689c, 1);
+      g.fillRect(21, 39, 11, 17);
       // One visible arm, swinging
       g.fillStyle(0xc94f42, 1);
-      g.fillRoundedRect(swing ? 12 : 17, 28, 7, 13, 3);
-      g.fillStyle(0xf2c29b, 1);
-      g.fillCircle(swing ? 15 : 20, 44, 4);
+      g.fillRoundedRect(swing ? 14 : 20, 34, 9, 16, 4);
+      g.fillStyle(0xf6c795, 1);
+      g.fillCircle(swing ? 18 : 24, 53, 5);
       // Head in profile: face toward the left edge, one eye
-      g.fillStyle(0xf2c29b, 1);
-      g.fillCircle(22, 18, 10);
+      g.fillStyle(0xf6c795, 1);
+      g.fillCircle(27, 22, 12);
       g.fillStyle(0x333333, 1);
-      g.fillCircle(16, 18, 1.5);
+      g.fillCircle(20, 22, 1.8);
+      g.fillStyle(0xf0a868, 0.7);
+      g.fillCircle(19, 27, 3.4);
       // Hat brim juts forward
-      g.fillStyle(0xe8c766, 1);
-      g.fillEllipse(20, 11, 38, 9);
-      g.fillStyle(0xdcae45, 1);
-      g.fillRoundedRect(12, 1, 20, 10, 4);
+      g.fillStyle(0xf0d060, 1);
+      g.fillEllipse(25, 13, 46, 10);
+      g.fillStyle(0xe3ba45, 1);
+      g.fillRoundedRect(15, 1, 24, 12, 5);
       g.fillStyle(0xb5502f, 1);
-      g.fillRect(12, 8, 20, 3);
+      g.fillRect(15, 9, 24, 4);
       return;
     }
 
     // Front (down) and back (up) views share the body plan.
-    const leftBootY = swing ? 58 : 56;
-    const rightBootY = swing ? 53 : 56;
-    g.fillStyle(0x4a3826, 1);
-    g.fillRoundedRect(13, leftBootY, 9, 7, 2);
-    g.fillRoundedRect(26, rightBootY, 9, 7, 2);
-    g.fillStyle(0x3d5a80, 1);
-    g.fillRect(14, 42, 8, 15);
-    g.fillRect(26, 42, 8, 15);
-    g.fillStyle(0xc94f42, 1);
-    g.fillRoundedRect(11, 26, 26, 20, 6);
+    const leftBootY = swing ? 69 : 67;
+    const rightBootY = swing ? 64 : 67;
+    g.fillStyle(0x5a4030, 1);
+    g.fillRoundedRect(15, leftBootY, 11, 8, 3);
+    g.fillRoundedRect(31, rightBootY, 11, 8, 3);
+    g.fillStyle(0x46689c, 1);
+    g.fillRect(16, 50, 10, 18);
+    g.fillRect(31, 50, 10, 18);
+    g.fillStyle(0x3a5884, 1);
+    g.fillRect(21, 50, 5, 18);
+    g.fillRect(36, 50, 5, 18);
+    // Rounded torso with a shaded right side
+    g.fillStyle(0xd65347, 1);
+    g.fillRoundedRect(13, 32, 31, 24, 9);
+    g.fillStyle(0xb8453b, 1);
+    g.fillRoundedRect(35, 32, 9, 24, { tl: 0, tr: 9, bl: 0, br: 9 });
     if (dir === 'down') {
-      g.fillStyle(0x3d5a80, 1);
-      g.fillRect(18, 32, 12, 14);
-      g.fillRect(15, 26, 4, 8);
-      g.fillRect(29, 26, 4, 8);
+      g.fillStyle(0x46689c, 1);
+      g.fillRect(21, 39, 15, 17);
+      g.fillRect(17, 32, 5, 10);
+      g.fillRect(35, 32, 5, 10);
       g.fillStyle(0xf2c14e, 1);
-      g.fillCircle(19, 34, 1.6);
-      g.fillCircle(29, 34, 1.6);
+      g.fillCircle(22, 41, 2);
+      g.fillCircle(35, 41, 2);
     } else {
       // Back view: crossed overall straps, no bib
-      g.lineStyle(3, 0x3d5a80, 1);
+      g.lineStyle(4, 0x46689c, 1);
       g.beginPath();
-      g.moveTo(15, 27);
-      g.lineTo(33, 44);
-      g.moveTo(33, 27);
-      g.lineTo(15, 44);
+      g.moveTo(17, 33);
+      g.lineTo(40, 54);
+      g.moveTo(40, 33);
+      g.lineTo(17, 54);
       g.strokePath();
     }
     // Arms swing opposite between frames
-    g.fillStyle(0xc94f42, 1);
-    g.fillRoundedRect(5, swing ? 30 : 28, 7, 13, 3);
-    g.fillRoundedRect(36, swing ? 28 : 30, 7, 13, 3);
-    g.fillStyle(0xf2c29b, 1);
-    g.fillCircle(8, swing ? 46 : 44, 4);
-    g.fillCircle(40, swing ? 44 : 46, 4);
+    g.fillStyle(0xd65347, 1);
+    g.fillRoundedRect(6, swing ? 37 : 34, 9, 16, 4);
+    g.fillRoundedRect(42, swing ? 34 : 37, 9, 16, 4);
+    g.fillStyle(0xf6c795, 1);
+    g.fillCircle(10, swing ? 55 : 52, 5);
+    g.fillCircle(46, swing ? 52 : 55, 5);
     if (dir === 'down') {
-      g.fillStyle(0xf2c29b, 1);
-      g.fillCircle(24, 18, 10);
+      g.fillStyle(0xf6c795, 1);
+      g.fillCircle(28, 22, 12);
       g.fillStyle(0x333333, 1);
-      g.fillCircle(20, 18, 1.5);
-      g.fillCircle(28, 18, 1.5);
-      g.lineStyle(1.4, 0x9a5b3c, 1);
+      g.fillCircle(23, 22, 1.8);
+      g.fillCircle(33, 22, 1.8);
+      g.fillStyle(0xf0a868, 0.7);
+      g.fillCircle(19, 27, 3.6);
+      g.fillCircle(37, 27, 3.6);
+      g.lineStyle(1.6, 0x9a5b3c, 1);
       g.beginPath();
-      g.arc(24, 21, 4, 0.15 * Math.PI, 0.85 * Math.PI);
+      g.arc(28, 25, 5, 0.15 * Math.PI, 0.85 * Math.PI);
       g.strokePath();
     } else {
       // Back of the head: hair under the hat brim
       g.fillStyle(0x6b4a2b, 1);
-      g.fillCircle(24, 19, 10);
-      g.fillRect(14, 19, 20, 7);
+      g.fillCircle(28, 23, 12);
+      g.fillRect(16, 23, 24, 8);
     }
-    g.fillStyle(0xe8c766, 1);
-    g.fillEllipse(24, 11, 36, 9);
-    g.fillStyle(0xdcae45, 1);
-    g.fillRoundedRect(14, 1, 20, 10, 4);
+    g.fillStyle(0xf0d060, 1);
+    g.fillEllipse(28, 13, 44, 10);
+    g.fillStyle(0xe3ba45, 1);
+    g.fillRoundedRect(16, 1, 24, 12, 5);
     g.fillStyle(0xb5502f, 1);
-    g.fillRect(14, 8, 20, 3);
+    g.fillRect(16, 9, 24, 4);
   }
 
   private makeCropTextures(): void {
@@ -240,13 +400,20 @@ export class BootScene extends Phaser.Scene {
         g.fillEllipse(13, 16, 15, 6);
         g.fillEllipse(31, 11, 15, 6);
         if (stage === 3) {
-          // Two ripe cobs with husks
-          g.fillStyle(0xf2c14e, 1);
-          g.fillRoundedRect(26, 18, 8, 15, 4);
-          g.fillRoundedRect(10, 24, 8, 14, 4);
-          g.fillStyle(0x7ec850, 1);
-          g.fillTriangle(30, 33, 26, 24, 34, 26);
-          g.fillTriangle(14, 38, 10, 29, 18, 31);
+          // Three fat ripe cobs with kernel dots and green husks
+          const cob = (x: number, y: number) => {
+            g.fillStyle(0xf7b733, 1);
+            g.fillRoundedRect(x, y, 10, 17, 5);
+            g.fillStyle(0xffd94d, 1);
+            g.fillCircle(x + 3, y + 5, 1.6);
+            g.fillCircle(x + 7, y + 8, 1.6);
+            g.fillCircle(x + 4, y + 12, 1.6);
+            g.fillStyle(0x7ec850, 1);
+            g.fillTriangle(x + 5, y + 18, x, y + 8, x + 10, y + 10);
+          };
+          cob(27, 14);
+          cob(7, 20);
+          cob(18, 24);
         }
       }
       g.generateTexture(`crop-corn-${stage}`, 44, 44);
@@ -256,49 +423,64 @@ export class BootScene extends Phaser.Scene {
   }
 
   private makeCustomerTextures(): void {
-    // Original NPC customers, 48x64, three looks: different shirt
-    // colours, skin tones and hair. Same proportions as the farmer so
-    // the world reads consistently, but no hat and their own palette.
+    // Original NPC customers, 56x76, three looks in the same rounder
+    // proportions as the farmer: an orange sun hat with overalls, a
+    // wide purple hat (the queue silhouette in every farm game), and
+    // a teal cap. Their own palettes and faces, drawn in code.
     const variants = [
-      { shirt: 0x2e86ab, trousers: 0x5b4636, skin: 0x8d5a3b, hair: 0x222222, bun: true },
-      { shirt: 0x7d5ba6, trousers: 0x3d405b, skin: 0xf2c29b, hair: 0x6b4a2b, bun: false },
-      { shirt: 0xe8873a, trousers: 0x4a6741, skin: 0xc68642, hair: 0x111111, bun: false },
+      { shirt: 0x3f7fbf, shade: 0x33669e, trousers: 0x46689c, skin: 0x8d5a3b, hat: 0xf29c38, hatShade: 0xd9822a, hair: 0x222222 },
+      { shirt: 0xe8873a, shade: 0xc96f27, trousers: 0x5b4636, skin: 0xf6c795, hat: 0x9b7ed9, hatShade: 0x8266bd, hair: 0x6b4a2b },
+      { shirt: 0x57a639, shade: 0x47872e, trousers: 0x3d405b, skin: 0xc68642, hat: 0x2e9e8f, hatShade: 0x248277, hair: 0x111111 },
     ];
     variants.forEach((v, i) => {
       const g = this.add.graphics();
-      g.fillStyle(0x4a3826, 1);
-      g.fillRoundedRect(13, 56, 9, 7, 2);
-      g.fillRoundedRect(26, 56, 9, 7, 2);
+      g.fillStyle(0x5a4030, 1);
+      g.fillRoundedRect(15, 67, 11, 8, 3);
+      g.fillRoundedRect(31, 67, 11, 8, 3);
       g.fillStyle(v.trousers, 1);
-      g.fillRect(14, 42, 8, 15);
-      g.fillRect(26, 42, 8, 15);
+      g.fillRect(16, 50, 10, 18);
+      g.fillRect(31, 50, 10, 18);
+      // Rounded torso with a shaded right side
       g.fillStyle(v.shirt, 1);
-      g.fillRoundedRect(11, 26, 26, 20, 6);
-      g.fillRoundedRect(5, 28, 7, 13, 3);
-      g.fillRoundedRect(36, 28, 7, 13, 3);
+      g.fillRoundedRect(13, 32, 31, 24, 9);
+      g.fillStyle(v.shade, 1);
+      g.fillRoundedRect(35, 32, 9, 24, { tl: 0, tr: 9, bl: 0, br: 9 });
+      g.fillStyle(v.shirt, 1);
+      g.fillRoundedRect(6, 34, 9, 16, 4);
+      g.fillRoundedRect(42, 34, 9, 16, 4);
       g.fillStyle(v.skin, 1);
-      g.fillCircle(8, 44, 4);
-      g.fillCircle(40, 44, 4);
-      g.fillCircle(24, 18, 10);
-      // Hair: cap over the top of the head, plus a bun on variant 0
+      g.fillCircle(10, 52, 5);
+      g.fillCircle(46, 52, 5);
+      g.fillCircle(28, 22, 12);
+      // Hair peeking under the hat
       g.fillStyle(v.hair, 1);
-      g.fillEllipse(24, 11, 21, 10);
-      if (v.bun) g.fillCircle(24, 3, 5);
+      g.fillEllipse(28, 13, 22, 9);
       g.fillStyle(0x333333, 1);
-      g.fillCircle(20, 19, 1.5);
-      g.fillCircle(28, 19, 1.5);
-      g.generateTexture(`customer-${i}`, 48, 64);
+      g.fillCircle(23, 22, 1.8);
+      g.fillCircle(33, 22, 1.8);
+      g.lineStyle(1.6, 0x9a5b3c, 1);
+      g.beginPath();
+      g.arc(28, 25, 5, 0.15 * Math.PI, 0.85 * Math.PI);
+      g.strokePath();
+      // Hat: wide brim and a rounded crown, shaded underneath
+      g.fillStyle(v.hatShade, 1);
+      g.fillEllipse(28, 14, 46, 11);
+      g.fillStyle(v.hat, 1);
+      g.fillEllipse(28, 12, 46, 10);
+      g.fillRoundedRect(17, 1, 22, 11, 5);
+      g.generateTexture(`customer-${i}`, 56, 76);
       g.destroy();
     });
   }
 
   private makeBubbleTexture(): void {
-    // Speech bubble for orders, 96x66, with a tail at the bottom.
+    // Speech bubble for orders, 96x66, cream with a warm brown
+    // outline and a tail at the bottom.
     const g = this.add.graphics();
-    g.fillStyle(0xffffff, 0.96);
+    g.fillStyle(0xfff6de, 0.98);
     g.fillRoundedRect(2, 2, 92, 50, 12);
     g.fillTriangle(40, 52, 56, 52, 48, 64);
-    g.lineStyle(2, 0x000000, 0.12);
+    g.lineStyle(3, 0x8a5a2b, 0.9);
     g.strokeRoundedRect(2, 2, 92, 50, 12);
     g.generateTexture('bubble', 96, 66);
     g.destroy();
@@ -381,6 +563,9 @@ export class BootScene extends Phaser.Scene {
       g.fillEllipse(19, 34, 26, 6);
       g.fillStyle(0xffffff, 1);
       g.fillEllipse(18, 24, 26, 20); // body
+      g.fillStyle(0xe9e2d2, 1);
+      g.fillEllipse(19, 29, 22, 12); // shaded underside
+      g.fillStyle(0xffffff, 1);
       g.fillTriangle(4, 18, 10, 26, 2, 28); // tail
       const headY = frame === 0 ? 12 : 22;
       const headX = frame === 0 ? 29 : 31;
@@ -413,7 +598,9 @@ export class BootScene extends Phaser.Scene {
       g.fillRect(48, 36, 6, 11);
       g.fillStyle(0xffffff, 1);
       g.fillRoundedRect(10, 12, 50, 28, 10); // body
-      g.fillStyle(0x8a5a3b, 1);
+      g.fillStyle(0xe8e2d6, 1);
+      g.fillRoundedRect(10, 30, 50, 10, { tl: 0, tr: 0, bl: 10, br: 10 }); // shaded belly
+      g.fillStyle(0x3a3a3a, 1);
       g.fillEllipse(26, 22, 18, 12); // patches
       g.fillEllipse(48, 32, 14, 10);
       const headY = frame === 0 ? 16 : 32;
@@ -463,29 +650,38 @@ export class BootScene extends Phaser.Scene {
   }
 
   private makeFenceTextures(): void {
-    // Horizontal segment, 64x40: two posts, two rails.
+    // Horizontal segment, 64x40: chunky posts with caps, thick rails.
     const g = this.add.graphics();
-    g.fillStyle(0xa9743f, 1);
-    g.fillRect(4, 4, 8, 34);
-    g.fillRect(52, 4, 8, 34);
-    g.fillRect(0, 10, 64, 7);
-    g.fillRect(0, 24, 64, 7);
+    g.fillStyle(0xb5793a, 1);
+    g.fillRect(3, 6, 10, 34);
+    g.fillRect(51, 6, 10, 34);
+    g.fillRect(0, 11, 64, 9);
+    g.fillRect(0, 26, 64, 9);
+    g.fillStyle(0xd09a55, 1);
+    g.fillRect(0, 11, 64, 3);
+    g.fillRect(0, 26, 64, 3);
     g.fillStyle(0x8f5e30, 1);
-    g.fillRect(4, 4, 8, 4);
-    g.fillRect(52, 4, 8, 4);
+    g.fillRect(3, 36, 10, 4);
+    g.fillRect(51, 36, 10, 4);
+    g.fillStyle(0xd09a55, 1);
+    g.fillRect(1, 2, 14, 6);
+    g.fillRect(49, 2, 14, 6);
     g.generateTexture('fence', 64, 40);
     g.destroy();
 
     // Vertical segment, 40x64: same fence running down the screen.
     const v = this.add.graphics();
-    v.fillStyle(0xa9743f, 1);
-    v.fillRect(4, 4, 34, 8);
-    v.fillRect(4, 52, 34, 8);
-    v.fillRect(10, 0, 7, 64);
-    v.fillRect(24, 0, 7, 64);
-    v.fillStyle(0x8f5e30, 1);
-    v.fillRect(4, 4, 4, 8);
-    v.fillRect(4, 52, 4, 8);
+    v.fillStyle(0xb5793a, 1);
+    v.fillRect(6, 3, 34, 10);
+    v.fillRect(6, 51, 34, 10);
+    v.fillRect(11, 0, 9, 64);
+    v.fillRect(26, 0, 9, 64);
+    v.fillStyle(0xd09a55, 1);
+    v.fillRect(11, 0, 3, 64);
+    v.fillRect(26, 0, 3, 64);
+    v.fillStyle(0xd09a55, 1);
+    v.fillRect(2, 1, 6, 14);
+    v.fillRect(2, 49, 6, 14);
     v.generateTexture('fence-v', 40, 64);
     v.destroy();
   }
@@ -608,14 +804,14 @@ export class BootScene extends Phaser.Scene {
       g.fillCircle(x + 22, y - 1, 6);
       g.fillCircle(x + 34, y + 2, 6);
     });
-    // Awning: scalloped stripes
+    // Awning: blue and white scalloped stripes, market style
     for (let i = 0; i < 8; i++) {
-      g.fillStyle(i % 2 === 0 ? 0xd64541 : 0xf7f3e8, 1);
+      g.fillStyle(i % 2 === 0 ? 0x5ea9dd : 0xf7f3e8, 1);
       const x = 4 + i * 28;
       g.fillRect(x, 18, 28, 34);
       g.fillCircle(x + 14, 52, 14);
     }
-    g.fillStyle(0x8f3b34, 1);
+    g.fillStyle(0x3f7fbf, 1);
     g.fillRect(0, 12, 232, 8);
     g.generateTexture('stall', 232, 180);
     g.destroy();
@@ -667,7 +863,7 @@ export class BootScene extends Phaser.Scene {
     coin.destroy();
 
     const gem = this.add.graphics();
-    gem.fillStyle(0xc77dff, 1);
+    gem.fillStyle(0x2fa8f0, 1);
     gem.beginPath();
     gem.moveTo(11, 1);
     gem.lineTo(21, 8);
@@ -675,8 +871,10 @@ export class BootScene extends Phaser.Scene {
     gem.lineTo(1, 8);
     gem.closePath();
     gem.fillPath();
-    gem.fillStyle(0xe9c6ff, 1);
+    gem.fillStyle(0x9fdcff, 1);
     gem.fillTriangle(11, 4, 17, 8, 5, 8);
+    gem.fillStyle(0x1d7fc4, 1);
+    gem.fillTriangle(11, 21, 17, 8, 5, 8);
     gem.generateTexture('icon-gem', 22, 22);
     gem.destroy();
 

@@ -32,7 +32,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // Feet-level body so the figure can pass close in front of fences.
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.setSize(30, 18);
-    body.setOffset(9, 44);
+    body.setOffset(13, 56);
 
     Player.ensureAnimations(scene);
 

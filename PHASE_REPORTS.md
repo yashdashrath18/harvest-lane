@@ -508,3 +508,32 @@ ACCEPTANCE CRITERIA (deliverables):
 - [x] QA report (PHASE_REPORTS.md, Phases 1 to 10).
 - [x] SDK integration notes (docs/PLATFORM_NOTES.md and the Phase 8 report).
 - [x] Publishing checklist: the before-submitting list in the submission draft.
+
+## ADDENDUM, 2026-10-30 (later the same evening): GitHub Pages hosting
+STATUS: Live and verified.
+
+- Yash chose GitHub Pages. The Muse GitHub App could not create the repository (403, resource not accessible by integration), so Yash created the public repo "harvest-lane" himself with a README and enabled Pages on main; Muse then pushed the package via the connector (38 files, commit 8a193faa): the playable build at the root, README, docs/, the full src/, and PHASE_REPORTS.md.
+- Repository: https://github.com/yashdashrath18/harvest-lane
+- Live game: https://yashdashrath18.github.io/harvest-lane/
+- Verification: the first Pages build served the default Jekyll rendering of the initial README (build of the pre-push commit); after the deploy caught up, the root serves the game index.html (title "Harvest Lane", SDK script in head) and the JS asset returns 200 at the full 1,549,742 bytes. The sandbox's headless Chrome cannot reach github.io through its proxy (same tunnel failure as youtube.com), so the in-browser play check of the live URL was replaced by HTTP verification of the exact bytes that were already play-tested locally from the identical package; Yash can play the live URL on his own device as the final human check.
+- The submission draft's field 6 is now filled with this link. Remaining before submission: correct the Page 1 how-heard placeholder, confirm the field 11 checkboxes, submit, and wait for Google.
+
+## INTERFACE CONVERSION, 2026-10-30 (after Phase 10, at Yash's request)
+STATUS: Complete and republished. Yash uploaded the reference game's screenshots again and chose the full conversion scope: UI, world, and characters, in that game's visual direction but with all art redrawn in code (originality rule kept). The rewarded-ad modals and gem pads were deliberately not copied, as before.
+
+WHAT CHANGED:
+- Palette: bright lime grass with blade tufts, sandy paths, richer soil; UIStyle is now cream panels (0xfdf3da), wood borders (0x8a5a2b), brown ink text, blue ribbons, chunky green buttons. The dark plum theme is gone everywhere.
+- Panels: one shared shell (UIScene.makePanel): dim backdrop, cream card with thick wood border, blue ribbon header with the title, red round close button. Shop, missions, and settings all use it. Missions gained reference-style progress bars with counts inside; settings sliders are green with white ringed knobs; the settings panel is visually near-identical in layout to the reference's.
+- HUD: farmer avatar medallion with star badge top-left; SETTINGS gear medallion and SHOP backpack medallion down the left edge with outlined labels; currency pills top-right (cash stack and blue gem icons, amounts, plus buttons that open the shop and missions panels respectively, so every control does something real); a wide cream objective card top-centre with an item icon chip and star; MISSION clipboard button on the right edge; backpack pill with fill bar bottom-left. The old top bar, TASKS and bottom-left buttons are gone; joystick exclusion zones were updated to match (left column, mission button, top band).
+- World: chunkier post-and-rail fences with caps and highlights; blue-and-white striped stall awning (was red); ripe corn now shows three fat cobs with kernel dots and husks; black-and-white cow patches; shaded chicken undersides; brighter tree greens; cream order bubbles with brown outlines.
+- Characters: farmer and customers redrawn at 56x76 (from 48x64), rounder bodies with shaded sides, bigger heads, rosy cheeks; the farmer keeps his straw hat and overalls; customers now wear an orange sun hat, a wide purple hat, and a teal cap. Player physics body offset adjusted for the new frame size.
+- Menu: chunkier title stroke, cream subtitle pill, green play button.
+- New code-drawn HUD textures: avatar, icon-star, icon-clipboard, btn-close, icon-cash, icon-bag, icon-gear-med. The gem currency is now a blue diamond (texture and HUD colour), matching the reference.
+
+VERIFIED:
+- 29 unit tests pass; TypeScript build passes.
+- Full Phase 9 core-loop regression re-run against the new interface: identical results (collision stop x 696, harvest, deposit, corn x3 served for exactly 18 coins, boots purchase, unlock with 48 carrots, area mission claim for 5 gems, egg pickup, shop pause and resume through the new SHOP medallion and ribbon close button), zero console errors. The regression script's button coordinates were updated to the new layout.
+- Visual checks in qa/convert-{menu,game,stall,missions,settings,shop}.png: HUD has no overlaps (an initial objective-card/currency-pill overlap was found and fixed by narrowing the card to 248px), panels match the reference family, sliders render and the settings panel pauses the game.
+- One test-script fault during verification (a double-click that closed then reopened the missions panel) was diagnosed as script error, not a game bug; the close button works on a single precise click.
+
+REPUBLISHED: release build rebuilt, publish staging refreshed (build, source, this report), pushed to GitHub (harvest-lane repo), and the live Pages asset verified serving the new bundle.

@@ -16,34 +16,39 @@ export class MainMenuScene extends Phaser.Scene {
       .setOrigin(0, 0);
 
     this.add
-      .text(DESIGN_WIDTH / 2, 300, 'HARVEST LANE', {
+      .text(DESIGN_WIDTH / 2, 296, 'HARVEST LANE', {
         fontFamily: 'Arial, sans-serif',
-        fontSize: '52px',
+        fontSize: '56px',
         fontStyle: 'bold',
         color: '#ffffff',
         stroke: '#3d6b2f',
-        strokeThickness: 8,
+        strokeThickness: 10,
       })
       .setOrigin(0.5);
 
     this.add
-      .text(DESIGN_WIDTH / 2, 356, 'Farm. Harvest. Sell. Grow.', {
+      .text(DESIGN_WIDTH / 2, 356, 'Grow it. Harvest it. Sell it.', {
         fontFamily: 'Arial, sans-serif',
         fontSize: '22px',
-        color: '#fff8d6',
+        fontStyle: 'bold',
+        color: '#5b3a1e',
+        backgroundColor: '#fdf3da',
+        padding: { x: 14, y: 7 },
       })
       .setOrigin(0.5);
 
     const button = this.add
-      .rectangle(DESIGN_WIDTH / 2, 470, 240, 72, 0xf2a541)
-      .setStrokeStyle(4, 0xffffff)
+      .rectangle(DESIGN_WIDTH / 2, 470, 250, 76, 0x57b93c)
+      .setStrokeStyle(4, 0x3d8a28)
       .setInteractive({ useHandCursor: true });
     const label = this.add
       .text(DESIGN_WIDTH / 2, 470, 'TAP TO PLAY', {
         fontFamily: 'Arial, sans-serif',
-        fontSize: '28px',
+        fontSize: '30px',
         fontStyle: 'bold',
         color: '#ffffff',
+        stroke: '#3d8a28',
+        strokeThickness: 4,
       })
       .setOrigin(0.5);
 
