@@ -114,7 +114,7 @@ Harvest Lane is an original work. All art, music, sound, writing, and code in th
 
 ## Author
 
-****Yash Dashrath**, Pune, Maharashtra, India
+**Yash Dashrath**, Pune, Maharashtra, India
 
 - GitHub: https://github.com/yashdashrath18
 - LinkedIn: https://www.linkedin.com/in/yash-dashrath
