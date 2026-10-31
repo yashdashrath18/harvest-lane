@@ -10,6 +10,7 @@ import {
   type MissionKind,
 } from '../data/MissionData';
 import type { MarketSystem } from './MarketSystem';
+import { XP_VALUES, contractClaimXp, missionClaimXp } from '../data/LevelData';
 
 export interface MissionRowState {
   id: string;
@@ -191,33 +192,38 @@ export class MissionSystem {
 
   /** Pays the reward if the mission, daily mission or contract is complete and unclaimed. */
   claim(id: string, market: MarketSystem): boolean {
+    return this.claimReward(id, market).ok;
+  }
+
+  /** Like claim(), but also reports the XP the claim earns (LevelData). */
+  claimReward(id: string, market: MarketSystem): { ok: boolean; xp: number } {
     this.ensureDaily();
     const daily = DAILY_POOL.find((d) => d.id === id);
     if (daily && this.dailyIds.includes(id)) {
-      if (this.dailyClaimed.has(id)) return false;
-      if ((this.dailyProgress.get(id) ?? 0) < daily.target) return false;
+      if (this.dailyClaimed.has(id)) return { ok: false, xp: 0 };
+      if ((this.dailyProgress.get(id) ?? 0) < daily.target) return { ok: false, xp: 0 };
       this.dailyClaimed.add(id);
       if (daily.rewardCoins) market.addCoins(daily.rewardCoins);
       if (daily.rewardGems) market.addGems(daily.rewardGems);
-      return true;
+      return { ok: true, xp: XP_VALUES.dailyClaim };
     }
     const contract = this.activeContracts.find((c) => c.uid === id);
     if (contract) {
-      if (this.progressOf(id) < contract.target) return false;
+      if (this.progressOf(id) < contract.target) return { ok: false, xp: 0 };
       if (contract.rewardCoins) market.addCoins(contract.rewardCoins);
       if (contract.rewardGems) market.addGems(contract.rewardGems);
       this.activeContracts = this.activeContracts.filter((c) => c.uid !== id);
       this.progress.delete(id);
       this.ensureContracts();
-      return true;
+      return { ok: true, xp: contractClaimXp(contract.tier) };
     }
     const mission = MISSIONS.find((m) => m.id === id);
-    if (!mission || this.claimed.has(id) || !this.isComplete(mission)) return false;
+    if (!mission || this.claimed.has(id) || !this.isComplete(mission)) return { ok: false, xp: 0 };
     this.claimed.add(id);
     if (mission.rewardCoins) market.addCoins(mission.rewardCoins);
     if (mission.rewardGems) market.addGems(mission.rewardGems);
     this.ensureContracts();
-    return true;
+    return { ok: true, xp: missionClaimXp(mission.rewardCoins ?? 0, mission.rewardGems ?? 0) };
   }
 
   /** Panel-ready snapshot: the base missions, then any live contracts. */

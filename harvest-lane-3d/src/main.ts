@@ -15,6 +15,7 @@ import { ProgressionSystem } from './systems/ProgressionSystem';
 import { MarketSystem } from './systems/MarketSystem';
 import { CustomerSystem3D } from './game/CustomerSystem3D';
 import { EventBus, GameEvents } from './game/EventBus';
+import { UNLOCKS, XP_VALUES, capacityBonusFor, totalXpForLevel, unlocksAt } from './data/LevelData';
 import { STALL_FRONT, STALL_POS } from './game/Layout';
 
 const app = document.getElementById('app')!;
@@ -135,15 +136,50 @@ class BurstPool {
 }
 const bursts = new BurstPool(scene);
 
-/** Awards XP and celebrates a level-up (gems, fanfare, capacity). */
+/** Refreshes the level badge (number, bar, xp count). */
+function refreshLevel(): void {
+  hud.setLevel(
+    progression.level,
+    progression.levelFraction,
+    `${progression.xpIntoLevel}/${ProgressionSystem.xpForNext(progression.level)}`,
+  );
+}
+
+// "+N XP" floats are batched so a fast harvest sweep shows one tidy
+// number instead of a stream (master prompt 1.3).
+let pendingXpFloat = 0;
+let xpFloatTimer: ReturnType<typeof setTimeout> | null = null;
+function queueXpFloat(amount: number): void {
+  pendingXpFloat += amount;
+  if (xpFloatTimer) return;
+  xpFloatTimer = setTimeout(() => {
+    xpFloatTimer = null;
+    if (pendingXpFloat > 0) floatAt(`+${pendingXpFloat} XP`, playerPos.x, playerPos.z - 0.8, '#c39bff');
+    pendingXpFloat = 0;
+  }, 600);
+}
+
+/** Awards XP and celebrates a level-up (panel, gems, capacity, confetti). */
 function gainXp(amount: number): void {
+  const capBefore = capacityBonusFor(progression.level);
   const res = progression.gain(amount);
-  hud.setLevel(progression.level, progression.levelFraction);
+  refreshLevel();
+  queueXpFloat(amount);
   if (res.levelsGained > 0) {
     const gems = ProgressionSystem.gemsPerLevel * res.levelsGained;
     market.addGems(gems);
-    floatAt(`⭐ LEVEL ${res.level}! +${gems} 💎`, playerPos.x, playerPos.z, '#ffc93c');
-    bursts.spawn(playerPos.x, playerPos.z, 0xffc93c, 16, 1.4);
+    const capGain = capacityBonusFor(res.level) - capBefore;
+    const rewards = [`+${gems} 💎`];
+    if (capGain > 0) rewards.push(`+${capGain} 🎒 backpack space`);
+    const unlockLabels: string[] = [];
+    for (let l = res.level - res.levelsGained + 1; l <= res.level; l++) {
+      for (const u of unlocksAt(l)) unlockLabels.push(`${u.icon} ${u.label}`);
+    }
+    hud.showLevelUp(res.level, rewards.join(' · '), unlockLabels);
+    hud.bumpLevel();
+    bursts.spawn(playerPos.x, playerPos.z, 0xffc93c, 14, 1.4);
+    bursts.spawn(playerPos.x, playerPos.z, 0x57b93c, 14, 1.3);
+    bursts.spawn(playerPos.x, playerPos.z, 0x6bb7ff, 14, 1.5);
     Audio.playSuccess();
     applyUpgrades();
   }
@@ -153,7 +189,7 @@ cropField.onHarvest = (cropId, wx, wz) => {
   const added = backpack.add(cropId, 1);
   if (added <= 0) return false;
   missions.track('harvest', cropId, 1);
-  gainXp(1);
+  gainXp(XP_VALUES.harvest);
   Audio.playHarvest();
   bursts.spawn(wx, wz, cropId === 'carrot' ? 0xf08a2d : 0x7ec850, 7, 0.7);
   hud.setBag(backpack.total, backpack.capacity);
@@ -198,7 +234,7 @@ customers.onTryServe = (order) => {
   lastEarned = earned;
   missions.track('sell', order.itemId, order.quantity);
   missions.track('serve', undefined, 1);
-  gainXp(5);
+  gainXp(XP_VALUES.servePerItem * order.quantity);
   Audio.playCoin();
   refreshObjective();
   return true;
@@ -229,7 +265,7 @@ animals.onCollect = (itemId, wx, wz) => {
   const added = backpack.add(itemId, 1);
   if (added <= 0) return false;
   missions.track('collect', itemId, 1);
-  gainXp(2);
+  gainXp(XP_VALUES.collect);
   Audio.playPickup();
   hud.setBag(backpack.total, backpack.capacity);
   floatAt(`+1 ${ITEM_CHIP[itemId] ?? ''}`, wx, wz);
@@ -404,6 +440,7 @@ function churnStep(dtMs: number): void {
     churnTimerMs -= 700;
     if (backpack.remove('milk', 1) <= 0) break;
     backpack.add('cheese', 1);
+    gainXp(XP_VALUES.churn);
     hud.setBag(backpack.total, backpack.capacity);
     floatAt('+1 🧀', CHURN_POS.x, CHURN_POS.z, '#ffe066');
     Audio.playPickup();
@@ -640,8 +677,10 @@ function renderMissions(): void {
     .querySelectorAll('[data-claim]')
     .forEach((btn) =>
       btn.addEventListener('click', () => {
-        if (missions.claim(btn.getAttribute('data-claim')!, market)) {
+        const res = missions.claimReward(btn.getAttribute('data-claim')!, market);
+        if (res.ok) {
           Audio.playSuccess();
+          if (res.xp > 0) gainXp(res.xp);
           refreshObjective();
           renderMissions();
         } else Audio.playError();
@@ -719,6 +758,23 @@ function renderEarn(kind: keyof typeof EARN_OFFERS): void {
 hud.onOpenShop = renderShop;
 hud.onOpenMissions = renderMissions;
 hud.onOpenSettings = renderSettings;
+hud.onLevelTap = () => {
+  const cur = progression.level;
+  const rows: string[] = [
+    `<div class="panel-sub">⭐ You are Level ${cur} · ${progression.xpIntoLevel}/${ProgressionSystem.xpForNext(cur)} XP to Level ${cur + 1} · ${totalXpForLevel(cur + 1) - progression.xp} XP away</div>`,
+  ];
+  for (let l = cur + 1; l <= Math.min(50, cur + 5); l++) {
+    const defs = UNLOCKS[l] ?? [];
+    const body = defs.length
+      ? defs.map((d) => `${d.icon} ${d.label}`).join('<br/>')
+      : 'Gems and backpack space';
+    const hot = l === 10 ? ' style="border-color:#d9930d;background:#fff3cf"' : '';
+    rows.push(
+      `<div class="shop-row"${hot}><div class="grow"><div class="name">Level ${l}${l === 10 ? ' · 🏨 Hotel' : ''}</div><div class="desc">${body}</div></div><span class="max">${totalXpForLevel(l)} XP</span></div>`,
+    );
+  }
+  hud.openPanel('Level Roadmap', rows.join(''));
+};
 hud.onPillCoins = () => renderEarn('coins');
 hud.onPillGems = () => renderEarn('gems');
 
@@ -766,7 +822,7 @@ function collectSave(): GameSave {
 function applySave(save: GameSave): void {
   market.restore({ coins: save.coins, gems: save.gems, stock: save.stock, pendingCash: save.pendingCash });
   progression.restore({ xp: save.xp });
-  hud.setLevel(progression.level, progression.levelFraction);
+  refreshLevel();
   animals.restoreFeed(save.feed);
   helperHired = save.helperHired;
   churnOwned = save.churnOwned;

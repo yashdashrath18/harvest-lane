@@ -15,10 +15,13 @@ export class HUD {
   private objectiveChipEl: HTMLElement;
   private harvestBtn: HTMLButtonElement;
   private menuEl: HTMLDivElement;
+  private levelUpEl: HTMLDivElement;
+  private levelUpShownAt = 0;
   onHarvest: (() => void) | null = null;
   onOpenShop: (() => void) | null = null;
   onOpenMissions: (() => void) | null = null;
   onOpenSettings: (() => void) | null = null;
+  onLevelTap: (() => void) | null = null;
   onPillCoins: (() => void) | null = null;
   onPillGems: (() => void) | null = null;
   onPlay: (() => void) | null = null;
@@ -31,7 +34,7 @@ export class HUD {
         <div class="avatar"><svg viewBox="0 0 64 64" width="46" height="46"><circle cx="32" cy="36" r="13" fill="#f6c795"/><ellipse cx="32" cy="24" rx="21" ry="5" fill="#f0d060"/><rect x="21" y="8" width="22" height="13" rx="5" fill="#e3ba45"/><rect x="21" y="17" width="22" height="4" fill="#b5502f"/><circle cx="27" cy="36" r="1.9" fill="#333"/><circle cx="37" cy="36" r="1.9" fill="#333"/><path d="M27 42a6 6 0 0 0 10 0" stroke="#9a5b3c" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M14 64c2-8 9-12 18-12s16 4 18 12z" fill="#d65347"/></svg></div>
         <svg class="star" viewBox="0 0 24 24"><path d="M12 1.8l3.1 6.9 7.5.7-5.6 5 1.6 7.4L12 18l-6.6 3.8L7 14.4 1.4 9.4l7.5-.7z" fill="#ffc93c" stroke="#d9930d" stroke-width="1.4"/></svg>
       </div>
-      <div class="level-badge"><span id="level-txt">Lv 1</span><div class="xp-track"><div class="xp-fill" id="xp-fill"></div></div></div>
+      <div class="level-badge clickable" id="btn-level"><span id="level-txt">Lv 1</span><div class="xp-track"><div class="xp-fill" id="xp-fill"></div></div><div class="xp-num" id="xp-num">0/50</div></div>
       <div class="saved-tag" id="saved-tag">Saved ✓</div>
       <div class="medallions">
         <button class="medallion clickable" id="btn-settings">
@@ -59,6 +62,14 @@ export class HUD {
       <div class="stock-chip" id="stock-chip" style="display:none">Stall empty</div>
       <div class="hint">Drag the joystick to move, or use WASD</div>
       <button class="harvest-btn clickable" id="btn-harvest">HARVEST</button>
+      <div id="levelup" class="hidden">
+        <div class="lu-card">
+          <div class="lu-title" id="lu-title">⭐ LEVEL 2!</div>
+          <div class="lu-rewards" id="lu-rewards"></div>
+          <div class="lu-unlocks" id="lu-unlocks"></div>
+          <button class="lu-btn clickable" id="lu-continue">Continue</button>
+        </div>
+      </div>
       <div id="menu">
         <div class="logo">
           <svg class="sprout" viewBox="0 0 48 32"><path d="M24 30 C24 20 24 14 24 8" stroke="#3d8a28" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M24 12 C16 12 10 7 9 1 C17 2 23 5 24 12z" fill="#57b93c"/><path d="M24 9 C31 9 37 5 39 0 C32 -0.5 25 3 24 9z" fill="#7ec850" transform="translate(1.5,1)"/></svg>
@@ -84,6 +95,7 @@ export class HUD {
     this.objectiveChipEl = $('obj-chip');
     this.harvestBtn = $('btn-harvest') as HTMLButtonElement;
     this.menuEl = $('menu') as HTMLDivElement;
+    this.levelUpEl = $('levelup') as HTMLDivElement;
     $('btn-play').addEventListener('click', () => this.onPlay?.());
     this.harvestBtn.addEventListener('click', () => this.onHarvest?.());
     $('btn-shop').addEventListener('click', () => this.onOpenShop?.());
@@ -91,6 +103,11 @@ export class HUD {
     $('btn-missions').addEventListener('click', () => this.onOpenMissions?.());
     $('plus-gems').addEventListener('click', () => this.onOpenMissions?.());
     $('btn-settings').addEventListener('click', () => this.onOpenSettings?.());
+    $('btn-level').addEventListener('click', () => this.onLevelTap?.());
+    $('lu-continue').addEventListener('click', () => this.hideLevelUp());
+    this.levelUpEl.addEventListener('click', () => {
+      if (Date.now() - this.levelUpShownAt > 600) this.hideLevelUp();
+    });
     $('pill-coins').addEventListener('click', () => this.onPillCoins?.());
     $('pill-gems').addEventListener('click', () => this.onPillGems?.());
     $('panel-close').addEventListener('click', () => this.closePanel());
@@ -135,10 +152,40 @@ export class HUD {
     this.objectiveEl.textContent = text;
     this.objectiveChipEl.textContent = chip;
   }
-  /** Farm level badge under the avatar, with the XP progress bar. */
-  setLevel(level: number, fraction: number): void {
+  /** Farm level badge under the avatar, with the XP progress bar and count. */
+  setLevel(level: number, fraction: number, xpText?: string): void {
     this.root.querySelector<HTMLElement>('#level-txt')!.textContent = `Lv ${level}`;
-    this.root.querySelector<HTMLElement>('#xp-fill')!.style.width = `${Math.round(Math.min(1, Math.max(0, fraction)) * 100)}%`;
+    const fill = this.root.querySelector<HTMLElement>('#xp-fill')!;
+    fill.style.transition = 'width 0.4s ease-out';
+    fill.style.width = `${Math.round(Math.min(1, Math.max(0, fraction)) * 100)}%`;
+    if (xpText) this.root.querySelector<HTMLElement>('#xp-num')!.textContent = xpText;
+    const track = this.root.querySelector<HTMLElement>('.xp-track')!;
+    track.classList.remove('pulse');
+    void track.offsetWidth;
+    track.classList.add('pulse');
+  }
+  /** Bounce the level badge (level-up feedback). */
+  bumpLevel(): void {
+    const badge = this.root.querySelector<HTMLElement>('#btn-level')!;
+    badge.classList.remove('bump');
+    void badge.offsetWidth;
+    badge.classList.add('bump');
+  }
+  /** Slide-in LEVEL UP panel: rewards and whatever the level unlocked. */
+  showLevelUp(level: number, rewardsText: string, unlockLabels: string[]): void {
+    this.root.querySelector<HTMLElement>('#lu-title')!.textContent = `⭐ LEVEL ${level}!`;
+    this.root.querySelector<HTMLElement>('#lu-rewards')!.textContent = rewardsText;
+    const unlocks = this.root.querySelector<HTMLElement>('#lu-unlocks')!;
+    unlocks.innerHTML = unlockLabels.length
+      ? unlockLabels.map((u) => `<div class="lu-unlock">🔓 Unlocked: ${u}</div>`).join('')
+      : '';
+    this.levelUpShownAt = Date.now();
+    this.levelUpEl.classList.remove('hidden');
+    requestAnimationFrame(() => this.levelUpEl.classList.add('show'));
+  }
+  hideLevelUp(): void {
+    this.levelUpEl.classList.remove('show');
+    this.levelUpEl.classList.add('hidden');
   }
   /** Brief "Saved ✓" flash so players can see their farm is safe. */
   flashSaved(): void {

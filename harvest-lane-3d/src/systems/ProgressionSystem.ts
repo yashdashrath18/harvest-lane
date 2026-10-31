@@ -1,22 +1,25 @@
+import { MAX_LEVEL, capacityBonusFor, xpForNextLevel } from '../data/LevelData';
+
 /**
- * Farm levels and XP. Every core action earns XP (harvest, collect,
- * serve); levelling up pays gems and permanently raises backpack
- * capacity by 1 per level (capped at +10), so a level-up is felt in
- * the hands, not just seen as a number. Pure logic, unit tested.
+ * Farm levels and XP. Every core action earns XP (values in
+ * data/LevelData.ts); levelling up pays gems and permanently raises
+ * backpack capacity (+1 per level to 20, then every 2 levels), so a
+ * level-up is felt in the hands, not just seen as a number. The curve
+ * is round(50 * 1.35^(level-1)) with a level cap of 50. Pure logic.
  */
 export class ProgressionSystem {
   xp = 0;
 
   /** XP needed to advance from `level` to `level + 1`. */
   static xpForNext(level: number): number {
-    return Math.round(40 * Math.pow(level, 1.32));
+    return xpForNextLevel(level);
   }
 
-  /** The level a total-XP value corresponds to (levels start at 1). */
+  /** The level a total-XP value corresponds to (levels start at 1, cap 50). */
   static levelFor(xp: number): number {
     let level = 1;
     let rest = xp;
-    while (rest >= ProgressionSystem.xpForNext(level)) {
+    while (level < MAX_LEVEL && rest >= ProgressionSystem.xpForNext(level)) {
       rest -= ProgressionSystem.xpForNext(level);
       level++;
     }
@@ -27,20 +30,25 @@ export class ProgressionSystem {
     return ProgressionSystem.levelFor(this.xp);
   }
 
-  /** Progress through the current level, 0..1, for the HUD bar. */
-  get levelFraction(): number {
+  /** XP accumulated inside the current level. */
+  get xpIntoLevel(): number {
     let rest = this.xp;
     let level = 1;
-    while (rest >= ProgressionSystem.xpForNext(level)) {
+    while (level < MAX_LEVEL && rest >= ProgressionSystem.xpForNext(level)) {
       rest -= ProgressionSystem.xpForNext(level);
       level++;
     }
-    return rest / ProgressionSystem.xpForNext(level);
+    return rest;
   }
 
-  /** Permanent backpack capacity bonus from levels: +1 per level past 1, capped at +10. */
+  /** Progress through the current level, 0..1, for the HUD bar. */
+  get levelFraction(): number {
+    return this.xpIntoLevel / ProgressionSystem.xpForNext(this.level);
+  }
+
+  /** Permanent backpack capacity bonus from levels (data/LevelData rule). */
   get capacityBonus(): number {
-    return Math.min(10, this.level - 1);
+    return capacityBonusFor(this.level);
   }
 
   /** Gems paid per level gained. */
