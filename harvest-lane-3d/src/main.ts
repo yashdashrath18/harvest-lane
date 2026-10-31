@@ -951,11 +951,6 @@ function animate(): void {
   camera.position.set(camTarget.x + CAM_OFFSET.x, CAM_OFFSET.y, camTarget.z + CAM_OFFSET.z);
   camera.lookAt(camTarget.x, 0.8, camTarget.z - 1.5);
 
-  // Keep the stall stock chip pinned above the stall.
-  const chipPos = projector(X(STALL_POS.x), 4.4, Z(STALL_POS.y));
-  hud.stockChip.style.left = `${chipPos.sx}px`;
-  hud.stockChip.style.top = `${chipPos.sy}px`;
-
   renderer.render(scene, camera);
   if (firstFrame) {
     firstFrame = false;

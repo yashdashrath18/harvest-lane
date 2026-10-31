@@ -50,11 +50,8 @@ export class HUD {
       <div class="objective">
         <div class="chip" id="obj-chip">🌽</div>
         <div class="txt" id="obj-txt">...</div>
+        <button class="obj-missions clickable" id="btn-missions">MISSIONS <span>›</span></button>
       </div>
-      <button class="mission-btn clickable" id="btn-missions">
-        <svg viewBox="0 0 44 54"><rect x="4" y="6" width="36" height="46" rx="6" fill="#8a5a2b"/><rect x="8" y="12" width="28" height="36" rx="4" fill="#fff6de"/><rect x="16" y="2" width="12" height="9" rx="3" fill="#c9cfd6"/><path d="M13 22l3 3 6-6M13 33l3 3 6-6M13 44l3 3 6-6" stroke="#57a639" stroke-width="3" fill="none"/></svg>
-        <span>MISSION</span>
-      </button>
       <div class="bag-pill">
         <div class="row"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 8V7a6 6 0 0 1 12 0v1h3v13H3V8zm2 0h8V7a4 4 0 0 0-8 0z" fill="#fdf3da"/></svg><span id="bag">0/10</span></div>
         <div class="bar"><div class="fill" id="bag-fill"></div></div>
@@ -63,9 +60,12 @@ export class HUD {
       <div class="hint">Drag the joystick to move, or use WASD</div>
       <button class="harvest-btn clickable" id="btn-harvest">HARVEST</button>
       <div id="menu">
-        <h1>HARVEST<br/>LANE 3D</h1>
+        <div class="logo">
+          <svg class="sprout" viewBox="0 0 48 32"><path d="M24 30 C24 20 24 14 24 8" stroke="#3d8a28" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M24 12 C16 12 10 7 9 1 C17 2 23 5 24 12z" fill="#57b93c"/><path d="M24 9 C31 9 37 5 39 0 C32 -0.5 25 3 24 9z" fill="#7ec850" transform="translate(1.5,1)"/></svg>
+          <h1>HARVEST<br/>LANE 3D</h1>
+        </div>
         <div class="sub">Grow it. Harvest it. Sell it.</div>
-        <button class="play" id="btn-play">TAP TO PLAY</button>
+        <button class="play" id="btn-play">▶ PLAY</button>
       </div>
       <div class="panel-wrap" id="panel-wrap">
         <div class="panel">
