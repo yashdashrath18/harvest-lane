@@ -3,7 +3,7 @@
  * (harvests, sales, serves, collections, area unlocks); rewards are
  * claimed manually from the missions panel.
  */
-export type MissionKind = 'harvest' | 'sell' | 'serve' | 'collect' | 'area';
+export type MissionKind = 'harvest' | 'sell' | 'serve' | 'collect' | 'area' | 'plant';
 
 export interface MissionDefinition {
   id: string;
@@ -56,6 +56,7 @@ export const CONTRACT_TEMPLATES: ContractTemplate[] = [
   { key: 'collect-egg', kind: 'collect', itemId: 'egg', title: (t) => `Collect ${t} eggs`, baseTarget: 30, growth: 1.5, coinRate: 2 },
   { key: 'collect-milk', kind: 'collect', itemId: 'milk', title: (t) => `Collect ${t} milk`, baseTarget: 20, growth: 1.5, coinRate: 3 },
   { key: 'harvest-carrot', kind: 'harvest', itemId: 'carrot', title: (t) => `Harvest ${t} carrots`, baseTarget: 40, growth: 1.5, coinRate: 1.5 },
+  { key: 'plant', kind: 'plant', title: (t) => `Plant ${t} seeds`, baseTarget: 50, growth: 1.5, coinRate: 1 },
 ];
 
 export const CONTRACT_SLOTS = 3;
@@ -83,6 +84,7 @@ export const DAILY_POOL: DailyMissionDefinition[] = [
   { id: 'daily-sell-corn', title: 'Daily: Sell 30 corn', kind: 'sell', itemId: 'corn', target: 30, rewardGems: 1 },
   { id: 'daily-milk', title: 'Daily: Collect 8 milk', kind: 'collect', itemId: 'milk', target: 8, rewardCoins: 50 },
   { id: 'daily-carrots', title: 'Daily: Harvest 25 carrots', kind: 'harvest', itemId: 'carrot', target: 25, rewardGems: 2 },
+  { id: 'daily-plant', title: 'Daily: Plant 20 seeds', kind: 'plant', target: 20, rewardGems: 2 },
 ];
 
 export const DAILY_COUNT = 3;

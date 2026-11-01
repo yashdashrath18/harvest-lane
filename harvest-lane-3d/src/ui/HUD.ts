@@ -23,6 +23,7 @@ export class HUD {
   onOpenSettings: (() => void) | null = null;
   onLevelTap: (() => void) | null = null;
   onPillCoins: (() => void) | null = null;
+  onSeedHint: (() => void) | null = null;
   onPillGems: (() => void) | null = null;
   onPlay: (() => void) | null = null;
 
@@ -60,6 +61,8 @@ export class HUD {
         <div class="bar"><div class="fill" id="bag-fill"></div></div>
       </div>
       <div class="stock-chip" id="stock-chip" style="display:none">Stall empty</div>
+      <div class="seed-pill" id="seed-pill">🌱 Seeds 30/30</div>
+      <button class="seed-hint clickable" id="seed-hint" style="display:none">Out of seeds, tap to buy 🌱</button>
       <div class="hint">Drag the joystick to move, or use WASD</div>
       <button class="harvest-btn clickable" id="btn-harvest">HARVEST</button>
       <div id="levelup" class="hidden">
@@ -104,6 +107,7 @@ export class HUD {
     $('plus-gems').addEventListener('click', () => this.onOpenMissions?.());
     $('btn-settings').addEventListener('click', () => this.onOpenSettings?.());
     $('btn-level').addEventListener('click', () => this.onLevelTap?.());
+    $('seed-hint').addEventListener('click', () => this.onSeedHint?.());
     $('lu-continue').addEventListener('click', () => this.hideLevelUp());
     this.levelUpEl.addEventListener('click', () => {
       if (Date.now() - this.levelUpShownAt > 600) this.hideLevelUp();
@@ -186,6 +190,20 @@ export class HUD {
   hideLevelUp(): void {
     this.levelUpEl.classList.remove('show');
     this.levelUpEl.classList.add('hidden');
+  }
+  /** Seed bag readout above the backpack pill (master prompt S2). */
+  setSeeds(text: string): void {
+    this.root.querySelector<HTMLElement>('#seed-pill')!.textContent = text;
+  }
+  /** Shows or hides the tappable out-of-seeds hint above the stock bar. */
+  showSeedHint(cropLabel: string | null): void {
+    const el = this.root.querySelector<HTMLElement>('#seed-hint')!;
+    if (!cropLabel) {
+      el.style.display = 'none';
+      return;
+    }
+    el.textContent = `Out of ${cropLabel} seeds, tap to buy 🌱`;
+    el.style.display = 'block';
   }
   /** Brief "Saved ✓" flash so players can see their farm is safe. */
   flashSaved(): void {

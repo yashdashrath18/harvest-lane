@@ -24,6 +24,7 @@ function sampleSave(): GameSave {
     churnOwned: false,
     stock: { corn: 5, egg: 2 },
     backpack: { corn: 4 },
+    seeds: { corn: 12, carrot: 3 },
     upgrades: { backpack: 1, boots: 2 },
     areaUnlocked: true,
     missions: { progress: { 'harvest-30': 30, 'serve-10': 4 }, claimed: ['harvest-30'] },
@@ -34,6 +35,21 @@ function sampleSave(): GameSave {
 }
 
 describe('SaveSystem validation', () => {
+  it('migrates a v1 save to v2 with starter seeds and everything else intact', () => {
+    const v1 = sampleSave() as unknown as Record<string, unknown>;
+    v1.version = 1;
+    delete v1.seeds;
+    const migrated = validateSave(v1);
+    expect(migrated).not.toBeNull();
+    expect(migrated!.version).toBe(SAVE_VERSION);
+    // South Field owned in the fixture: corn bag plus carrot starter.
+    expect(migrated!.seeds).toEqual({ corn: 30, carrot: 10 });
+    expect(migrated!.coins).toBe(240);
+    expect(migrated!.cosmetics.farmer).toBe('ocean');
+    const v1NoSouth = { ...v1, areaUnlocked: false };
+    expect(validateSave(v1NoSouth)!.seeds).toEqual({ corn: 30 });
+  });
+
   it('round-trips a full save through serialize and parse', () => {
     const save = sampleSave();
     const back = parseSaveString(serializeSave(save));

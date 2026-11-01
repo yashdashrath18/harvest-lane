@@ -10,7 +10,8 @@ interface Crop {
   mesh: THREE.Mesh;
   /** Milliseconds of growth accumulated. */
   grownMs: number;
-  state: 'growing' | 'ready' | 'regrowing';
+  /** bare = harvested soil waiting for a seed (master prompt S2). */
+  state: 'growing' | 'ready' | 'bare';
   stage: number;
 }
 
@@ -39,8 +40,10 @@ export class CropField3D {
   private growthScale = 1;
   private tickMs = 0;
   onHarvest: ((cropId: string, x: number, z: number) => boolean) | null = null;
+  onPlant: ((cropId: string, x: number, z: number) => boolean) | null = null;
   onFull: (() => void) | null = null;
   private fullCooldownMs = 0;
+  private plantCooldownMs = 0;
 
   constructor(scene: THREE.Scene) {
     const plant = (field: RectPx, cropId: string, phaseSeed: number) => {
@@ -113,6 +116,18 @@ export class CropField3D {
     });
   }
 
+  /** QA helper: strips every planted crop back to bare soil. */
+  debugMakeBare(): void {
+    this.crops.forEach((c) => {
+      if (c.state !== 'bare') {
+        c.state = 'bare';
+        c.grownMs = 0;
+        c.mesh.visible = false;
+        c.stage = -1;
+      }
+    });
+  }
+
   get cropCount(): number {
     return this.crops.length;
   }
@@ -137,9 +152,9 @@ export class CropField3D {
   }
 
   /**
-   * Harvests the ready crop at a point, if one is there: the same
-   * regrow bookkeeping as a player walk-over, minus the backpack.
-   * Returns the crop id, or null when nothing was ready.
+   * Harvests the ready crop at a point, if one is there (the helper's
+   * path; the player harvests by walking over). The plot is left as
+   * bare soil. Returns the crop id, or null when nothing was ready.
    */
   harvestCropAt(x: number, z: number): string | null {
     for (const c of this.crops) {
@@ -147,7 +162,7 @@ export class CropField3D {
       const dx = c.x - x;
       const dz = c.z - z;
       if (dx * dx + dz * dz < 0.95) {
-        c.state = 'regrowing';
+        c.state = 'bare';
         c.grownMs = 0;
         c.mesh.visible = false;
         c.stage = -1;
@@ -157,37 +172,72 @@ export class CropField3D {
     return null;
   }
 
+  /** Plants the bare plot at a point (the helper's path). Returns the crop id or null. */
+  plantCropAt(x: number, z: number): string | null {
+    for (const c of this.crops) {
+      if (c.state !== 'bare') continue;
+      const dx = c.x - x;
+      const dz = c.z - z;
+      if (dx * dx + dz * dz < 0.95) {
+        c.state = 'growing';
+        c.grownMs = 0;
+        c.stage = -1;
+        c.mesh.visible = true;
+        return c.def.id;
+      }
+    }
+    return null;
+  }
+
+  /** The bare plot nearest to a point, optionally restricted to crop ids. */
+  nearestBareCrop(x: number, z: number, onlyIds?: string[]): { x: number; z: number; id: string } | null {
+    let best: Crop | null = null;
+    let bestDist = Infinity;
+    for (const c of this.crops) {
+      if (c.state !== 'bare') continue;
+      if (onlyIds && !onlyIds.includes(c.def.id)) continue;
+      const d = (c.x - x) ** 2 + (c.z - z) ** 2;
+      if (d < bestDist) {
+        bestDist = d;
+        best = c;
+      }
+    }
+    return best ? { x: best.x, z: best.z, id: best.def.id } : null;
+  }
+
+  /** The bare plot under a point, if any (drives the out-of-seeds hint). */
+  bareCropAt(x: number, z: number): string | null {
+    for (const c of this.crops) {
+      if (c.state !== 'bare') continue;
+      const dx = c.x - x;
+      const dz = c.z - z;
+      if (dx * dx + dz * dz < 0.81) return c.def.id;
+    }
+    return null;
+  }
+
+  bareCount(): number {
+    return this.crops.filter((c) => c.state === 'bare').length;
+  }
+
   update(dtMs: number, playerX: number, playerZ: number, timeSec: number): void {
     this.fullCooldownMs = Math.max(0, this.fullCooldownMs - dtMs);
+    this.plantCooldownMs = Math.max(0, this.plantCooldownMs - dtMs);
     this.tickMs += dtMs;
     const doTick = this.tickMs >= 120;
     if (doTick) this.tickMs = 0;
 
     for (const crop of this.crops) {
-      if (crop.state !== 'ready') {
+      if (crop.state === 'growing') {
         crop.grownMs += dtMs * this.growthScale;
-        const target = crop.state === 'regrowing' ? crop.def.regrowTimeMs : crop.def.growthTimeMs;
-        if (crop.grownMs >= target) {
-          if (crop.state === 'regrowing') {
-            crop.state = 'growing';
-            crop.grownMs = 0;
-          } else {
-            crop.state = 'ready';
-          }
-        }
+        if (crop.grownMs >= crop.def.growthTimeMs) crop.state = 'ready';
       }
-      if (doTick) {
+      if (doTick && crop.state !== 'bare') {
         const stage =
           crop.state === 'ready'
             ? 3
             : Math.min(2, Math.floor((crop.grownMs / crop.def.growthTimeMs) * 3));
-        if (crop.state === 'regrowing') {
-          crop.mesh.visible = crop.grownMs > crop.def.regrowTimeMs * 0.4;
-          if (crop.mesh.visible && crop.stage !== 0) {
-            crop.mesh.geometry = CROP_GEOMETRIES[crop.def.id][0];
-            crop.stage = 0;
-          }
-        } else if (stage !== crop.stage) {
+        if (stage !== crop.stage) {
           crop.mesh.geometry = CROP_GEOMETRIES[crop.def.id][stage];
           crop.stage = stage;
         }
@@ -201,15 +251,30 @@ export class CropField3D {
         const dx = crop.x - playerX;
         const dz = crop.z - playerZ;
         if (dx * dx + dz * dz < 0.81) {
-          // Stepped on: the game decides whether it fits.
+          // Stepped on: the game decides whether it fits. A harvest
+          // leaves bare soil behind (master prompt S2).
           if (this.onHarvest?.(crop.def.id, crop.x, crop.z)) {
-            crop.state = 'regrowing';
+            crop.state = 'bare';
             crop.grownMs = 0;
             crop.mesh.visible = false;
             crop.stage = -1;
           } else if (this.fullCooldownMs <= 0) {
             this.fullCooldownMs = 1200;
             this.onFull?.();
+          }
+        }
+      } else if (crop.state === 'bare' && this.plantCooldownMs <= 0) {
+        const dx = crop.x - playerX;
+        const dz = crop.z - playerZ;
+        if (dx * dx + dz * dz < 0.81) {
+          // Stepped on bare soil: the game decides whether a seed
+          // gets planted (seed bag, per-plot cooldown 120ms).
+          if (this.onPlant?.(crop.def.id, crop.x, crop.z)) {
+            crop.state = 'growing';
+            crop.grownMs = 0;
+            crop.stage = -1;
+            crop.mesh.visible = true;
+            this.plantCooldownMs = 120;
           }
         }
       }

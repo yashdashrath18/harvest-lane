@@ -36,10 +36,13 @@ export class HelperAI {
   active = false;
   onHarvest: ((cropId: string) => void) | null = null;
   onDeposit: ((itemId: string) => void) | null = null;
+  /** Tier 2 (Level 8+): when set, the helper also plants bare plots. */
+  canPlant: (() => string[] | null) | null = null;
+  onPlant: ((x: number, z: number) => void) | null = null;
   private carry = new Map<string, number>();
   private carryTotal = 0;
   private waypoints: { x: number; z: number }[] = [];
-  private mode: 'seek' | 'harvest' | 'deposit' | 'idle' = 'idle';
+  private mode: 'seek' | 'harvest' | 'deposit' | 'idle' | 'plant' | 'seek-plant' = 'idle';
   private workTimerMs = 0;
   private facing = Math.PI;
   private walkPhase = 0;
@@ -86,6 +89,16 @@ export class HelperAI {
     const dt = dtMs / 1000;
     const pos = this.rig.group.position;
 
+    if (this.mode === 'plant') {
+      this.workTimerMs -= dtMs;
+      if (this.workTimerMs <= 0) {
+        this.onPlant?.(pos.x, pos.z);
+        this.mode = 'seek';
+      }
+      this.animateRig(false, dt);
+      return;
+    }
+
     if (this.mode === 'harvest' || this.mode === 'deposit') {
       this.workTimerMs -= dtMs;
       if (this.workTimerMs <= 0) {
@@ -124,6 +137,18 @@ export class HelperAI {
         if (crop) {
           this.routeTo(crop.x, crop.z);
           this.mode = 'seek';
+        } else if (this.carryTotal === 0 && this.canPlant) {
+          const plantable = this.canPlant();
+          const bare = plantable && plantable.length > 0 ? this.cropField.nearestBareCrop(pos.x, pos.z, plantable) : null;
+          if (bare) {
+            this.routeTo(bare.x, bare.z);
+            this.mode = 'seek-plant';
+          } else if (this.carryTotal > 0) {
+            this.routeTo(X(STALL_FRONT.x) - 0.8, Z(STALL_FRONT.y));
+            this.mode = 'deposit';
+          } else {
+            this.mode = 'idle';
+          }
         } else if (this.carryTotal > 0) {
           this.routeTo(X(STALL_FRONT.x) - 0.8, Z(STALL_FRONT.y));
           this.mode = 'deposit';
@@ -146,6 +171,9 @@ export class HelperAI {
       if (this.waypoints.length === 0) {
         if (this.mode === 'seek') {
           this.mode = 'harvest';
+          this.workTimerMs = 380;
+        } else if (this.mode === 'seek-plant') {
+          this.mode = 'plant';
           this.workTimerMs = 380;
         } else if (this.mode === 'deposit') {
           this.workTimerMs = 0;

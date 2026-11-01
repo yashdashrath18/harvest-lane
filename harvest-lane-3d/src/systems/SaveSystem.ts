@@ -14,7 +14,7 @@
 
 import { allSkinIds, FARMER_SKINS, WEATHER_SKINS, ROAD_SKINS } from '../data/SkinData';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 const SAVE_KEY = 'harvest-lane-save:game-save';
 const BACKUP_KEY = 'harvest-lane-save:game-save-corrupt-backup';
 export const SAVE_SIZE_LIMIT = 3 * 1024 * 1024; // Playables saveData cap
@@ -34,6 +34,8 @@ export interface GameSave {
   churnOwned: boolean;
   stock: Record<string, number>;
   backpack: Record<string, number>;
+  /** Seeds held in the seed bag, by crop id (save v2, master prompt S2). */
+  seeds: Record<string, number>;
   upgrades: Record<string, number>;
   areaUnlocked: boolean;
   missions: {
@@ -177,6 +179,7 @@ function normalizeV1(raw: Record<string, unknown>): GameSave {
     churnOwned: raw.churnOwned === true,
     stock: numberRecord(raw.stock),
     backpack: numberRecord(raw.backpack),
+    seeds: numberRecord(raw.seeds),
     upgrades: numberRecord(raw.upgrades),
     areaUnlocked: raw.areaUnlocked === true,
     missions: {
@@ -209,8 +212,15 @@ export function validateSave(raw: unknown): GameSave | null {
   if (typeof version !== 'number' || !Number.isInteger(version)) return null;
   if (version > SAVE_VERSION) return null; // written by a newer game
   if (version === SAVE_VERSION) return normalizeV1(raw);
-  // Future migrations slot in here, one step per version, e.g.
-  // if (version === 0) raw = migrate0to1(raw) then fall through.
+  if (version === 1) {
+    // v1 to v2 (master prompt S2): the seed bag is new. Migrated
+    // players start with a full bag of corn seeds, plus carrot seeds
+    // when they already own the South Field, so the replant loop
+    // never opens as a wall. Everything else carries over untouched.
+    const save = normalizeV1(raw);
+    save.seeds = save.areaUnlocked ? { corn: 30, carrot: 10 } : { corn: 30 };
+    return save;
+  }
   return null;
 }
 

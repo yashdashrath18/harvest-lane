@@ -233,6 +233,15 @@ class AudioSystem {
     ]);
   }
 
+  /** Planting: a soft low thud with a short rustle, pitch-varied. */
+  playPlant(): void {
+    const vary = 1 + (Math.random() - 0.5) * 0.16;
+    this.sfx([
+      { f: 110 * vary, d: 0.09, v: 0.25, slide: 70 },
+      { f: 300 * vary, d: 0.05, v: 0.07, at: 0.03, slide: 190 },
+    ]);
+  }
+
   playPickup(): void {
     if (this.sample('pluck', 0.8, 1 + Math.random() * 0.08)) return;
     this.sfx([{ f: 700, d: 0.07, v: 0.16, slide: 940 }]);

@@ -16,6 +16,8 @@ import { MarketSystem } from './systems/MarketSystem';
 import { CustomerSystem3D } from './game/CustomerSystem3D';
 import { EventBus, GameEvents } from './game/EventBus';
 import { UNLOCKS, XP_VALUES, capacityBonusFor, totalXpForLevel, unlocksAt } from './data/LevelData';
+import { SeedSystem, TRICKLE_INTERVAL_MS } from './systems/SeedSystem';
+import { SEED_PACKS, seedBagCapacity } from './data/SeedData';
 import { STALL_FRONT, STALL_POS } from './game/Layout';
 
 const app = document.getElementById('app')!;
@@ -47,6 +49,14 @@ const controls = new Controls(renderer.domElement);
 const backpack = new BackpackSystem(10);
 const missions = new MissionSystem();
 const progression = new ProgressionSystem();
+const seeds = new SeedSystem();
+
+/** Refreshes the seed bag readout (total/capacity plus per-crop counts). */
+function refreshSeeds(): void {
+  hud.setSeeds(
+    `🌱 Seeds ${seeds.total}/${seedBagCapacity(progression.level)} · 🌽 ${seeds.countOf('corn')} 🥕 ${seeds.countOf('carrot')}`,
+  );
+}
 hud.setLevel(1, 0);
 const cropField = new CropField3D(scene);
 // Real CC0 crop models (Quaternius) swap in over the procedural
@@ -200,6 +210,54 @@ cropField.onHarvest = (cropId, wx, wz) => {
 cropField.onFull = () => {
   floatAt('Backpack full', playerPos.x, playerPos.z, '#ffb3a3');
   Audio.playError();
+};
+
+/**
+ * Seed care (master prompt S2): the anti-softlock trickle and the
+ * out-of-seeds hint. Runs while playing; both checks are cheap and
+ * throttled to a 250ms tick.
+ */
+let trickleMs = 0;
+let seedHintMs = 0;
+function seedCareStep(dtMs: number): void {
+  seedHintMs += dtMs;
+  const stockTotal = Object.values(market.snapshot().stock).reduce((a, b) => a + b, 0);
+  const deadEnd = SeedSystem.shouldTrickle({
+    seedsTotal: seeds.total,
+    coins: market.coins,
+    hasRipeCrop: cropField.readyCount() > 0,
+    hasSellable: backpack.total > 0 || stockTotal > 0 || market.pendingCash > 0,
+  });
+  if (deadEnd) {
+    trickleMs += dtMs;
+    if (trickleMs >= TRICKLE_INTERVAL_MS) {
+      trickleMs = 0;
+      if (seeds.add('corn', 1, seedBagCapacity(progression.level)) > 0) {
+        floatAt('+1 🌽 seed (starter help)', playerPos.x, playerPos.z, '#b8f7a1');
+        refreshSeeds();
+      }
+    }
+  } else {
+    trickleMs = 0;
+  }
+  if (seedHintMs >= 250) {
+    seedHintMs = 0;
+    const bareId = cropField.bareCropAt(playerPos.x, playerPos.z);
+    hud.showSeedHint(bareId && seeds.countOf(bareId) === 0 ? bareId : null);
+  }
+}
+
+// Planting (master prompt S2): walking over bare soil with seeds in
+// the bag plants one, through the same path the helper uses.
+cropField.onPlant = (cropId, wx, wz) => {
+  if (!seeds.consume(cropId)) return false;
+  missions.track('plant', cropId, 1);
+  gainXp(XP_VALUES.plant);
+  Audio.playPlant();
+  bursts.spawn(wx, wz, 0x8a5a2b, 6, 0.6);
+  refreshSeeds();
+  refreshObjective();
+  return true;
 };
 
 // Market and customers.
@@ -408,6 +466,25 @@ helper.onHarvest = (cropId) => {
 helper.onDeposit = (itemId) => {
   market.addStock(itemId, 1);
 };
+// Helper tier 2 (Level 8+): he plants bare plots, drawing from the
+// same seed bag, when there is nothing ripe and his arms are empty.
+helper.canPlant = () => {
+  if (progression.level < 8) return null;
+  const ids = ['corn', 'carrot'].filter((id) => seeds.countOf(id) > 0);
+  return ids.length > 0 ? ids : null;
+};
+helper.onPlant = (x, z) => {
+  const cropId = cropField.bareCropAt(x, z);
+  if (!cropId || !seeds.consume(cropId)) return;
+  if (cropField.plantCropAt(x, z)) {
+    missions.track('plant', cropId, 1);
+    Audio.playPlant();
+    refreshSeeds();
+    refreshObjective();
+  } else {
+    seeds.add(cropId, 1, seedBagCapacity(progression.level));
+  }
+};
 
 // The cheese churn: stands west of the stall once bought, turns
 // milk into cheese (worth 3x) while the farmer stands at it.
@@ -501,10 +578,10 @@ function panelBody(): HTMLElement {
   return hud.root.querySelector('#panel-body')!;
 }
 
-let shopTab: 'upgrades' | 'skins' = 'upgrades';
+let shopTab: 'upgrades' | 'skins' | 'seeds' = 'upgrades';
 
 function shopTabsHtml(): string {
-  return `<div class="tab-row"><button class="tab-btn ${shopTab === 'upgrades' ? 'on' : ''}" data-shop-tab="upgrades">⬆️ Upgrades</button><button class="tab-btn ${shopTab === 'skins' ? 'on' : ''}" data-shop-tab="skins">🎨 Skins</button></div>`;
+  return `<div class="tab-row"><button class="tab-btn ${shopTab === 'upgrades' ? 'on' : ''}" data-shop-tab="upgrades">⬆️ Upgrades</button><button class="tab-btn ${shopTab === 'seeds' ? 'on' : ''}" data-shop-tab="seeds">🌱 Seeds</button><button class="tab-btn ${shopTab === 'skins' ? 'on' : ''}" data-shop-tab="skins">🎨 Skins</button></div>`;
 }
 
 function wireShopTabs(): void {
@@ -512,7 +589,8 @@ function wireShopTabs(): void {
     .querySelectorAll('[data-shop-tab]')
     .forEach((btn) =>
       btn.addEventListener('click', () => {
-        shopTab = btn.getAttribute('data-shop-tab') === 'skins' ? 'skins' : 'upgrades';
+        const tab = btn.getAttribute('data-shop-tab');
+        shopTab = tab === 'skins' ? 'skins' : tab === 'seeds' ? 'seeds' : 'upgrades';
         Audio.playClick();
         renderShop();
       }),
@@ -522,6 +600,10 @@ function wireShopTabs(): void {
 function renderShop(): void {
   if (shopTab === 'skins') {
     renderSkins();
+    return;
+  }
+  if (shopTab === 'seeds') {
+    renderSeeds();
     return;
   }
   const rows = upgrades
@@ -538,13 +620,17 @@ function renderShop(): void {
     .join('');
   const south = southUnlocked
     ? '<div class="shop-row"><div class="shop-info"><div class="shop-name">South Field</div><div class="shop-fx">Unlocked: 48 carrot plots growing</div></div><button class="buy-btn" disabled>OPEN</button></div>'
-    : `<div class="shop-row"><div class="shop-info"><div class="shop-name">South Field</div><div class="shop-fx">${SOUTH_FIELD.blurb}</div></div><button class="buy-btn" data-buy="south-field" ${market.coins < SOUTH_FIELD.cost ? 'disabled' : ''}>🪙 ${SOUTH_FIELD.cost}</button></div>`;
+    : progression.level < 3
+      ? '<div class="shop-row"><div class="shop-info"><div class="shop-name">South Field 🥕</div><div class="shop-fx">48 carrot plots in the south</div></div><button class="buy-btn" disabled>🔒 Level 3</button></div>'
+      : `<div class="shop-row"><div class="shop-info"><div class="shop-name">South Field</div><div class="shop-fx">${SOUTH_FIELD.blurb}</div></div><button class="buy-btn" data-buy="south-field" ${market.coins < SOUTH_FIELD.cost ? 'disabled' : ''}>🪙 ${SOUTH_FIELD.cost}</button></div>`;
   const helperRow = helperHired
     ? '<div class="shop-row"><div class="shop-info"><div class="shop-name">Farm Helper 🧑‍🌾</div><div class="shop-fx">Working your fields: harvests ripe crops and stocks the stall</div></div><button class="buy-btn" disabled>HIRED</button></div>'
     : `<div class="shop-row"><div class="shop-info"><div class="shop-name">Farm Helper 🧑‍🌾</div><div class="shop-fx">Harvests ripe crops and stocks the stall for you, all day</div></div><button class="buy-btn" data-buy="helper" ${market.coins < 300 ? 'disabled' : ''}>🪙 300</button></div>`;
   const churnRow = churnOwned
     ? '<div class="shop-row"><div class="shop-info"><div class="shop-name">Cheese Churn 🧀</div><div class="shop-fx">Built by the stall: stand at it with milk to churn cheese (sells for 42)</div></div><button class="buy-btn" disabled>BUILT</button></div>'
-    : `<div class="shop-row"><div class="shop-info"><div class="shop-name">Cheese Churn 🧀</div><div class="shop-fx">Turn 1 milk (14) into 1 cheese (42). Customers will start ordering it</div></div><button class="buy-btn" data-buy="churn" ${market.coins < 400 ? 'disabled' : ''}>🪙 400</button></div>`;
+    : progression.level < 6
+      ? '<div class="shop-row"><div class="shop-info"><div class="shop-name">Cheese Churn 🧀</div><div class="shop-fx">Turn 1 milk (14) into 1 cheese (42)</div></div><button class="buy-btn" disabled>🔒 Level 6</button></div>'
+      : `<div class="shop-row"><div class="shop-info"><div class="shop-name">Cheese Churn 🧀</div><div class="shop-fx">Turn 1 milk (14) into 1 cheese (42). Customers will start ordering it</div></div><button class="buy-btn" data-buy="churn" ${market.coins < 400 ? 'disabled' : ''}>🪙 400</button></div>`;
   hud.openPanel('Shop', shopTabsHtml() + rows + south + helperRow + churnRow);
   wireShopTabs();
   panelBody()
@@ -557,6 +643,9 @@ function renderShop(): void {
           southUnlocked = true;
           missions.track('area', undefined, 1);
           cropField.plantSouth(scene);
+          seeds.add('carrot', 10, seedBagCapacity(progression.level));
+          refreshSeeds();
+          floatAt('+10 🥕 seeds', playerPos.x, playerPos.z, '#b8f7a1');
           customers.allowCarrot = true;
           Audio.playSuccess();
           refreshObjective();
@@ -592,6 +681,48 @@ function renderShop(): void {
       }),
     );
 }
+
+/** The Seeds tab: seed packs for the replant loop (master prompt S2). */
+function renderSeeds(): void {
+  const cap = seedBagCapacity(progression.level);
+  const rows = SEED_PACKS.map((pack) => {
+    const held = seeds.countOf(pack.cropId);
+    const space = cap - seeds.total;
+    const btn =
+      space <= 0
+        ? '<button class="buy-btn" disabled>BAG FULL</button>'
+        : `<button class="buy-btn" data-seed-buy="${pack.cropId}" ${market.coins < pack.price ? 'disabled' : ''}>🪙 ${pack.price}</button>`;
+    return `<div class="shop-row"><div class="shop-info"><div class="shop-name">${pack.icon} ${pack.label} ×${pack.packSize}</div><div class="shop-fx">In your bag: ${held} · Seed bag ${seeds.total}/${cap}${space > 0 && space < pack.packSize ? ` · only ${space} fit` : ''}</div></div>${btn}</div>`;
+  }).join('');
+  hud.openPanel(
+    'Shop',
+    shopTabsHtml() +
+      rows +
+      '<div class="earn-note">Harvested plots stay bare until you plant. Walk over bare soil with seeds in the bag to plant. The bag grows +2 per farm level.</div>',
+  );
+  wireShopTabs();
+  panelBody()
+    .querySelectorAll('[data-seed-buy]')
+    .forEach((btn) =>
+      btn.addEventListener('click', () => {
+        const pack = SEED_PACKS.find((p) => p.cropId === btn.getAttribute('data-seed-buy'))!;
+        if (!market.spendCoins(pack.price)) return Audio.playError();
+        const added = seeds.add(pack.cropId, pack.packSize, seedBagCapacity(progression.level));
+        if (added <= 0) {
+          market.addCoins(pack.price); // bag filled between render and tap: refund
+          return Audio.playError();
+        }
+        Audio.playSuccess();
+        refreshSeeds();
+        renderSeeds();
+      }),
+    );
+}
+
+hud.onSeedHint = () => {
+  shopTab = 'seeds';
+  renderShop();
+};
 
 /** The Skins tab: farmer outfits, weather themes and road styles. */
 function renderSkins(): void {
@@ -780,6 +911,7 @@ hud.onPillGems = () => renderEarn('gems');
 
 // Saves and the Playables lifecycle (phase 6).
 import {
+  SAVE_VERSION,
   loadLocalSave,
   storeLocalSave,
   parseSaveString,
@@ -799,7 +931,7 @@ function collectSave(): GameSave {
     y: playerPos.z * 46 + 800,
   };
   return {
-    version: 1,
+    version: SAVE_VERSION,
     savedAt: Date.now(),
     coins: snap.coins,
     gems: snap.gems,
@@ -810,6 +942,7 @@ function collectSave(): GameSave {
     churnOwned,
     stock: snap.stock,
     backpack: backpack.snapshot(),
+    seeds: seeds.snapshot(),
     upgrades: upgrades.snapshot(),
     areaUnlocked: southUnlocked,
     missions: missions.snapshot(),
@@ -822,6 +955,8 @@ function collectSave(): GameSave {
 function applySave(save: GameSave): void {
   market.restore({ coins: save.coins, gems: save.gems, stock: save.stock, pendingCash: save.pendingCash });
   progression.restore({ xp: save.xp });
+  seeds.restore(save.seeds);
+  refreshSeeds();
   refreshLevel();
   animals.restoreFeed(save.feed);
   helperHired = save.helperHired;
@@ -897,10 +1032,12 @@ function queueOfflineEarnings(save: GameSave): void {
 // Boot: load first, then arm saving. In the Playables environment
 // the cloud save is the only save; standalone uses localStorage.
 async function boot(): Promise<void> {
+  let hadSave = false;
   if (Playables.inPlayablesEnv) {
     const raw = await Playables.loadCloudSave();
     const save = parseSaveString(raw);
     if (save) {
+      hadSave = true;
       applySave(save);
       queueOfflineEarnings(save);
     }
@@ -919,9 +1056,16 @@ async function boot(): Promise<void> {
   } else {
     const save = loadLocalSave();
     if (save) {
+      hadSave = true;
       applySave(save);
       queueOfflineEarnings(save);
     }
+  }
+  // A brand-new farm starts with a full bag of corn seeds (S2), so
+  // the replant loop never opens as a wall.
+  if (!hadSave) {
+    seeds.add('corn', seedBagCapacity(1), seedBagCapacity(1));
+    refreshSeeds();
   }
   // Restoring echoes change events; they are not new progress.
   saveDirty = false;
@@ -968,6 +1112,7 @@ hud.onPlay = () => {
       'Welcome back!',
       `<div class="earn-big">🌾</div><div class="earn-amt">Your farm kept selling</div>
        <div class="earn-note">While you were away the stall earned 🪙 ${grant} (up to 4 hours counted, more at higher farm levels).</div>
+       <div class="earn-note">Offline earnings come from already-planted crops and your animals. Crops are never auto-replanted while you are away.</div>
        <button class="watch-btn" id="btn-collect-offline">Collect 🪙 ${grant}</button>`,
     );
     panelBody().querySelector('#btn-collect-offline')!.addEventListener('click', () => {
@@ -1115,6 +1260,7 @@ function stepGame(dt: number, t: number): void {
         floatAt('⚡ Speed boost! 2 min', playerPos.x, playerPos.z, '#ffd94d');
         Audio.playSuccess();
       }
+      seedCareStep(dt * 1000);
     }
   }
 
@@ -1149,6 +1295,7 @@ if (import.meta.env.MODE !== 'release') {
     },
     crops: cropField,
     backpack,
+    seeds,
     missions,
     market,
     customers,
