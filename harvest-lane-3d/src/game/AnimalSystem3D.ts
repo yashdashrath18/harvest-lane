@@ -5,7 +5,7 @@ import { CHICKEN_PEN, COW_PEN, X, Z, type RectPx } from './Layout';
 import { assetUrl } from '../utils/assetUrl';
 import { MAT, blobShadow, box, makeChicken, makeCow, makeEggMesh, makeMilkMesh, type ChickenRig, type CowRig } from '../three/models';
 
-/** Trough capacity, in feed items (corn). One item fuels one product. */
+/** Base trough capacity (tier 0), in feed items. One item fuels one product. */
 export const FEED_MAX = 20;
 /** Where each pen's trough stands, in design pixels. */
 export const TROUGH_PX = {
@@ -100,6 +100,168 @@ export class AnimalSystem3D {
    * trough stops production and raises a "!" over the trough.
    */
   private feed: Record<'chicken' | 'cow', number> = { chicken: 6, cow: 6 };
+  /** Extension tiers owned per species (master prompt S4). */
+  private tiers: Record<'chicken' | 'cow', number> = { chicken: 0, cow: 0 };
+  /** The loaded cow GLTF, kept so cows bought later get the real model too. */
+  private cowTemplate: unknown = null;
+  private troughExtras: Record<'chicken' | 'cow', THREE.Group | null> = { chicken: null, cow: null };
+
+  tierOf(kind: 'chicken' | 'cow'): number {
+    return this.tiers[kind];
+  }
+
+  countOf(kind: 'chicken' | 'cow'): number {
+    return this.animals.filter((a) => a.kind === kind).length;
+  }
+
+  /** This species' current trough capacity (grows +5 per tier). */
+  feedMaxOf(kind: 'chicken' | 'cow'): number {
+    return FEED_MAX + 5 * this.tiers[kind];
+  }
+
+  /** Sets tiers (save restore): respawns animals to match and rebuilds extras. */
+  setTiers(tiers: { chicken: number; cow: number }): void {
+    this.tiers = {
+      chicken: Math.max(0, Math.min(9, Math.floor(tiers.chicken) || 0)),
+      cow: Math.max(0, Math.min(6, Math.floor(tiers.cow) || 0)),
+    };
+    const want = {
+      chicken: 3 + this.tiers.chicken,
+      cow: 2 + this.tiers.cow,
+    };
+    while (this.countOf('chicken') < want.chicken) this.spawnChicken(this.countOf('chicken'));
+    while (this.countOf('cow') < want.cow) this.spawnCow(this.countOf('cow'));
+    this.rebuildTroughExtras('chicken');
+    this.rebuildTroughExtras('cow');
+    this.refreshTrough('chicken');
+    this.refreshTrough('cow');
+  }
+
+  /** Buys one extension tier in-game: one more animal, more trough. */
+  addTier(kind: 'chicken' | 'cow'): void {
+    const next = { ...this.tiers, [kind]: this.tiers[kind] + 1 };
+    this.setTiers(next);
+  }
+
+  tiersSnapshot(): { chicken: number; cow: number } {
+    return { ...this.tiers };
+  }
+
+  /** One small extra trough per tier beside the main one (decorative, same pool). */
+  private rebuildTroughExtras(kind: 'chicken' | 'cow'): void {
+    const old = this.troughExtras[kind];
+    if (old) {
+      this.scene.remove(old);
+      this.troughExtras[kind] = null;
+    }
+    const tier = this.tiers[kind];
+    if (tier === 0) return;
+    const base = this.troughPos(kind);
+    const g = new THREE.Group();
+    for (let i = 0; i < tier; i++) {
+      const t = new THREE.Group();
+      const bin = box(0.9, 0.34, 0.5, MAT.woodDark, 0, 0.17, 0);
+      const rim = box(0.98, 0.08, 0.58, MAT.wood, 0, 0.36, 0);
+      const fill = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.1, 0.4), new THREE.MeshLambertMaterial({ color: 0xf2c14e }));
+      fill.position.y = 0.34;
+      t.add(bin, rim, fill);
+      t.position.set(1.35 + (i % 3) * 0.55, 0, 0.62 + Math.floor(i / 3) * 0.55);
+      g.add(t);
+    }
+    g.position.set(base.x, 0, base.z);
+    this.scene.add(g);
+    this.troughExtras[kind] = g;
+  }
+
+  private spawnChicken(index: number): void {
+    const b = penInner(CHICKEN_PEN, 34);
+    const rig = makeChicken();
+    const p = { x: b.minX + Math.random() * (b.maxX - b.minX), z: b.minZ + Math.random() * (b.maxZ - b.minZ) };
+    rig.group.position.set(p.x, 0, p.z);
+    rig.group.rotation.y = Math.random() * Math.PI * 2;
+    this.scene.add(rig.group);
+    this.animals.push({
+      kind: 'chicken',
+      chicken: rig,
+      group: rig.group,
+      tx: p.x,
+      tz: p.z,
+      pauseMs: 800 + index * 700,
+      phase: Math.random() * 6,
+      produceMs: EGG_EVERY_MS * (0.45 + (index * 0.37) % 0.8),
+    });
+  }
+
+  private spawnCow(index: number): void {
+    const b = penInner(COW_PEN, 40);
+    const p = { x: b.minX + Math.random() * (b.maxX - b.minX), z: b.minZ + Math.random() * (b.maxZ - b.minZ) };
+    if (this.cowTemplate) {
+      // Real model path: start from an empty wander group, then swap.
+      const group = new THREE.Group();
+      group.position.set(p.x, 0, p.z);
+      group.rotation.y = Math.random() * Math.PI * 2;
+      group.add(blobShadow(1.6));
+      this.scene.add(group);
+      const animal: Animal = {
+        kind: 'cow',
+        group,
+        tx: p.x,
+        tz: p.z,
+        pauseMs: 1_400 + index * 900,
+        phase: Math.random() * 6,
+        produceMs: MILK_EVERY_MS * (0.5 + index * 0.3),
+      };
+      this.animals.push(animal);
+      this.applyCowModel(animal, this.cowTemplate as never, index);
+      return;
+    }
+    const rig = makeCow();
+    rig.group.position.set(p.x, 0, p.z);
+    rig.group.rotation.y = Math.random() * Math.PI * 2;
+    this.scene.add(rig.group);
+    this.animals.push({
+      kind: 'cow',
+      cow: rig,
+      group: rig.group,
+      tx: p.x,
+      tz: p.z,
+      pauseMs: 1_400 + index * 900,
+      phase: Math.random() * 6,
+      produceMs: MILK_EVERY_MS * (0.5 + index * 0.3),
+    });
+  }
+
+  /** Swaps one cow's group contents for the real GLB model. */
+  private applyCowModel(a: Animal, gltf: { scene: THREE.Group; animations: THREE.AnimationClip[] }, index: number): void {
+    const bbox = new THREE.Box3().setFromObject(gltf.scene);
+    const height = Math.max(0.01, bbox.max.y - bbox.min.y);
+    const scale = 1.5 / height;
+    const inst = skeletonClone(gltf.scene) as THREE.Group;
+    inst.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        const converted = mats.map((m) => {
+          const std = m as THREE.MeshStandardMaterial;
+          return new THREE.MeshLambertMaterial({ color: std.color ? std.color.clone() : 0xffffff });
+        });
+        obj.material = Array.isArray(obj.material) ? converted : converted[0];
+      }
+    });
+    inst.scale.setScalar(scale);
+    inst.position.y = -bbox.min.y * scale;
+    inst.rotation.y = COW_MODEL_YAW;
+    while (a.group.children.length > 0) a.group.remove(a.group.children[0]);
+    a.group.add(blobShadow(1.6));
+    a.group.add(inst);
+    const mixer = new THREE.AnimationMixer(inst);
+    const actions = new Map<string, THREE.AnimationAction>();
+    for (const clip of gltf.animations) {
+      actions.set(clip.name.split('|').pop()!, mixer.clipAction(clip));
+    }
+    a.model = { mixer, actions, current: '', grazeClip: index % 2 === 0 ? 'Eating' : 'Idle_Headlow' };
+    a.cow = undefined;
+    this.setCowClip(a, a.model.grazeClip);
+  }
   private hungryFlag: Record<'chicken' | 'cow', boolean> = { chicken: false, cow: false };
   private troughFill: Partial<Record<'chicken' | 'cow', THREE.Mesh>> = {};
   private bangSprites: Partial<Record<'chicken' | 'cow', THREE.Sprite>> = {};
@@ -110,7 +272,7 @@ export class AnimalSystem3D {
 
   /** Adds feed to a trough; returns how much actually fit. */
   addFeed(kind: 'chicken' | 'cow', amount: number): number {
-    const added = Math.max(0, Math.min(FEED_MAX - this.feed[kind], amount));
+    const added = Math.max(0, Math.min(this.feedMaxOf(kind) - this.feed[kind], amount));
     if (added > 0) {
       this.feed[kind] += added;
       this.hungryFlag[kind] = false;
@@ -124,8 +286,8 @@ export class AnimalSystem3D {
   }
 
   restoreFeed(data: { chicken: number; cow: number }): void {
-    const clamp = (v: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(FEED_MAX, Math.max(0, Math.floor(v))) : 0);
-    this.feed = { chicken: clamp(data?.chicken), cow: clamp(data?.cow) };
+    const clamp = (v: number, kind: 'chicken' | 'cow') => (typeof v === 'number' && Number.isFinite(v) ? Math.min(this.feedMaxOf(kind), Math.max(0, Math.floor(v))) : 0);
+    this.feed = { chicken: clamp(data?.chicken, 'chicken'), cow: clamp(data?.cow, 'cow') };
     this.refreshTrough('chicken');
     this.refreshTrough('cow');
   }
@@ -138,7 +300,7 @@ export class AnimalSystem3D {
   private refreshTrough(kind: 'chicken' | 'cow'): void {
     const fill = this.troughFill[kind];
     if (fill) {
-      const frac = this.feed[kind] / FEED_MAX;
+      const frac = this.feed[kind] / this.feedMaxOf(kind);
       fill.visible = frac > 0;
       fill.scale.x = Math.max(0.05, frac);
     }
@@ -179,40 +341,11 @@ export class AnimalSystem3D {
   async loadCowModel(): Promise<void> {
     try {
       const gltf = await new GLTFLoader().loadAsync(assetUrl('models/Cow.glb'));
-      const box = new THREE.Box3().setFromObject(gltf.scene);
-      const height = Math.max(0.01, box.max.y - box.min.y);
-      const scale = 1.5 / height;
+      this.cowTemplate = gltf;
       let n = 0;
       for (const a of this.animals) {
         if (a.kind !== 'cow') continue;
-        const inst = skeletonClone(gltf.scene);
-        // The model ships MeshStandardMaterial, which renders far
-        // darker than the rest of this Lambert-lit scene without an
-        // environment map; convert to Lambert keeping the colours.
-        inst.traverse((obj) => {
-          if (obj instanceof THREE.Mesh) {
-            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-            const converted = mats.map((m) => {
-              const std = m as THREE.MeshStandardMaterial;
-              return new THREE.MeshLambertMaterial({ color: std.color ? std.color.clone() : 0xffffff });
-            });
-            obj.material = Array.isArray(obj.material) ? converted : converted[0];
-          }
-        });
-        inst.scale.setScalar(scale);
-        inst.position.y = -box.min.y * scale;
-        inst.rotation.y = COW_MODEL_YAW;
-        while (a.group.children.length > 0) a.group.remove(a.group.children[0]);
-        a.group.add(blobShadow(1.6));
-        a.group.add(inst);
-        const mixer = new THREE.AnimationMixer(inst);
-        const actions = new Map<string, THREE.AnimationAction>();
-        for (const clip of gltf.animations) {
-          actions.set(clip.name.split('|').pop()!, mixer.clipAction(clip));
-        }
-        a.model = { mixer, actions, current: '', grazeClip: n % 2 === 0 ? 'Eating' : 'Idle_Headlow' };
-        a.cow = undefined;
-        this.setCowClip(a, a.model.grazeClip);
+        this.applyCowModel(a, gltf, n);
         n++;
       }
       if (n > 0) this.cowModelReady = true;
@@ -233,48 +366,10 @@ export class AnimalSystem3D {
   }
 
   constructor(private scene: THREE.Scene) {
-    const chickenPen = penInner(CHICKEN_PEN, 34);
-    const cowPen = penInner(COW_PEN, 40);
-    const scatter = (b: typeof chickenPen) => ({
-      x: b.minX + Math.random() * (b.maxX - b.minX),
-      z: b.minZ + Math.random() * (b.maxZ - b.minZ),
-    });
-    for (let i = 0; i < 3; i++) {
-      const rig = makeChicken();
-      const p = scatter(chickenPen);
-      rig.group.position.set(p.x, 0, p.z);
-      rig.group.rotation.y = Math.random() * Math.PI * 2;
-      scene.add(rig.group);
-      this.animals.push({
-        kind: 'chicken',
-        chicken: rig,
-        group: rig.group,
-        tx: p.x,
-        tz: p.z,
-        pauseMs: 800 + i * 700,
-        phase: Math.random() * 6,
-        produceMs: EGG_EVERY_MS * (0.45 + (i * 0.37) % 0.8),
-      });
-    }
-    for (let i = 0; i < 2; i++) {
-      const rig = makeCow();
-      const p = scatter(cowPen);
-      rig.group.position.set(p.x, 0, p.z);
-      rig.group.rotation.y = Math.random() * Math.PI * 2;
-      scene.add(rig.group);
-      this.animals.push({
-        kind: 'cow',
-        cow: rig,
-        group: rig.group,
-        tx: p.x,
-        tz: p.z,
-        pauseMs: 1_400 + i * 900,
-        phase: Math.random() * 6,
-        produceMs: MILK_EVERY_MS * (0.5 + i * 0.3),
-      });
-    }
-    this.chickenPen = chickenPen;
-    this.cowPen = cowPen;
+    this.chickenPen = penInner(CHICKEN_PEN, 34);
+    this.cowPen = penInner(COW_PEN, 40);
+    for (let i = 0; i < 3; i++) this.spawnChicken(i);
+    for (let i = 0; i < 2; i++) this.spawnCow(i);
     this.buildTrough(scene, 'chicken');
     this.buildTrough(scene, 'cow');
   }
@@ -286,14 +381,15 @@ export class AnimalSystem3D {
     return this.pickups.length;
   }
 
-  private spawnPickup(itemId: 'egg' | 'milk', near: THREE.Group): void {
-    if (this.pickups.filter((p) => p.itemId === itemId).length >= MAX_PICKUPS) return;
+  private spawnPickup(itemId: 'egg' | 'milk', near: THREE.Group): boolean {
+    if (this.pickups.filter((p) => p.itemId === itemId).length >= MAX_PICKUPS) return false;
     const group = itemId === 'egg' ? makeEggMesh() : makeMilkMesh();
     const x = near.position.x + (Math.random() - 0.5) * 1.2;
     const z = near.position.z + (Math.random() - 0.5) * 1.2;
     group.position.set(x, 0, z);
     this.scene.add(group);
     this.pickups.push({ itemId, group, x, z, bornAt: performance.now() });
+    return true;
   }
 
   update(dtMs: number, playerX: number, playerZ: number): void {
@@ -309,9 +405,13 @@ export class AnimalSystem3D {
       if (a.produceMs <= 0) {
         a.produceMs = a.kind === 'chicken' ? EGG_EVERY_MS : MILK_EVERY_MS;
         if (this.feed[a.kind] > 0) {
-          this.feed[a.kind] -= 1;
-          this.refreshTrough(a.kind);
-          this.spawnPickup(a.kind === 'chicken' ? 'egg' : 'milk', a.group);
+          // Feed is only spent when the product actually lands on
+          // the ground (with 12 hens the pickup cap would otherwise
+          // burn the trough for nothing).
+          if (this.spawnPickup(a.kind === 'chicken' ? 'egg' : 'milk', a.group)) {
+            this.feed[a.kind] -= 1;
+            this.refreshTrough(a.kind);
+          }
         } else if (!this.hungryFlag[a.kind]) {
           this.hungryFlag[a.kind] = true;
           this.refreshTrough(a.kind);

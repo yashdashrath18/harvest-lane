@@ -29,6 +29,25 @@ export const FIELDS: Record<'A' | 'B' | 'CORN' | 'SOUTH', RectPx> = {
 export const CHICKEN_PEN: RectPx = { x: 620, y: 616, w: 240, h: 220 };
 export const COW_PEN: RectPx = { x: 628, y: 996, w: 368, h: 152 };
 
+/**
+ * The east expansion zone (master prompt S3), past the old perimeter
+ * fence: six purchasable strips of 8 corn plots each, and the East
+ * Field beyond them. Design px, same grid as everything else.
+ */
+export const EAST_ZONE: RectPx = { x: 1068, y: 140, w: 532, h: 1320 };
+export const STRIP_RECTS: RectPx[] = [0, 1, 2, 3, 4, 5].map((i) => ({
+  x: 1096,
+  y: 170 + i * 215,
+  w: 160,
+  h: 200,
+}));
+/** The plantable plot area inside a strip's fence (2 cols x 4 rows). */
+export function stripPlotRect(i: number): RectPx {
+  const s = STRIP_RECTS[i];
+  return { x: s.x + 34, y: s.y + 8, w: 92, h: 184 };
+}
+export const EAST_FIELD_RECT: RectPx = { x: 1300, y: 170, w: 276, h: 460 };
+
 export const STALL_POS = { x: 840, y: 1290 };
 export const STALL_FRONT = { x: 840, y: 1412 };
 export const SPAWN = { x: 540, y: 910 };

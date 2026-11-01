@@ -36,6 +36,12 @@ export interface GameSave {
   backpack: Record<string, number>;
   /** Seeds held in the seed bag, by crop id (save v2, master prompt S2). */
   seeds: Record<string, number>;
+  /** East Strip packs owned, 0..6 (master prompt S3). */
+  landPacks: number;
+  /** The East Field bought (master prompt S3). */
+  eastUnlocked: boolean;
+  /** Animal extension tiers owned (master prompt S4). */
+  animalTiers: { chicken: number; cow: number };
   upgrades: Record<string, number>;
   areaUnlocked: boolean;
   missions: {
@@ -116,12 +122,20 @@ function cleanVolume(value: unknown, fallback: number): number {
     : fallback;
 }
 
-/** Trough feed levels, clamped to the trough capacity. Saves written before feeding existed start with a half-full trough. */
+/** Trough feed levels, clamped to the largest possible trough (65 at max tier). Saves written before feeding existed start with a half-full trough. */
 function cleanFeed(value: unknown): GameSave['feed'] {
   if (!isRecord(value)) return { chicken: 6, cow: 6 };
   const clamp = (v: unknown) =>
-    typeof v === 'number' && Number.isFinite(v) ? Math.min(20, Math.max(0, Math.floor(v))) : 0;
+    typeof v === 'number' && Number.isFinite(v) ? Math.min(65, Math.max(0, Math.floor(v))) : 0;
   return { chicken: clamp(value.chicken), cow: clamp(value.cow) };
+}
+
+/** Animal extension tiers (master prompt S4), clamped to the data caps. */
+function cleanAnimalTiers(value: unknown): GameSave['animalTiers'] {
+  if (!isRecord(value)) return { chicken: 0, cow: 0 };
+  const clamp = (v: unknown, max: number) =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(0, Math.floor(v))) : 0;
+  return { chicken: clamp(value.chicken, 9), cow: clamp(value.cow, 6) };
 }
 
 /** Sanitises the cosmetics block against the SkinData catalogue: unknown ids drop out, the three free defaults are always owned, and each equipped slot falls back to its default when invalid or unowned. */
@@ -180,6 +194,9 @@ function normalizeV1(raw: Record<string, unknown>): GameSave {
     stock: numberRecord(raw.stock),
     backpack: numberRecord(raw.backpack),
     seeds: numberRecord(raw.seeds),
+    landPacks: Math.min(6, cleanInt(raw.landPacks)),
+    eastUnlocked: raw.eastUnlocked === true,
+    animalTiers: cleanAnimalTiers(raw.animalTiers),
     upgrades: numberRecord(raw.upgrades),
     areaUnlocked: raw.areaUnlocked === true,
     missions: {

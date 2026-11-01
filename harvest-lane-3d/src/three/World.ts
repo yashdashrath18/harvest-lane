@@ -1,6 +1,28 @@
 import * as THREE from 'three';
 import { MAT, box } from './models';
-import { FIELDS, CHICKEN_PEN, COW_PEN, STALL_POS, rect3, u, X, Z, type RectPx } from '../game/Layout';
+import { FIELDS, CHICKEN_PEN, COW_PEN, STALL_POS, EAST_ZONE, rect3, u, X, Z, type RectPx } from '../game/Layout';
+
+/** The shared soil material, kept so bought land can be fenced and soiled later. */
+let soilMaterial: THREE.MeshLambertMaterial | null = null;
+
+/**
+ * Adds a field's soil bed and fence (with gate gaps) to the scene.
+ * Used at build time for the starter fields and at purchase time for
+ * land bought in the shop (master prompt S3).
+ */
+export function addFieldVisuals(
+  scene: THREE.Scene,
+  rect: RectPx,
+  gaps: Partial<Record<'n' | 's' | 'e' | 'w', [number, number][]>> = {},
+): void {
+  if (!soilMaterial) return;
+  const { cx, cz, w, d } = rect3(rect);
+  const p = groundPlane(w, d, soilMaterial, 0.02);
+  p.position.x = cx;
+  p.position.z = cz;
+  scene.add(p);
+  scene.add(fenceRect(rect, gaps));
+}
 
 function canvasTexture(draw: (c: CanvasRenderingContext2D, s: number) => void, size = 256): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
@@ -265,6 +287,7 @@ export function buildWorld(scene: THREE.Scene): void {
   }, 512);
   soilTex.repeat.set(3, 3);
   const soilMat = new THREE.MeshLambertMaterial({ map: soilTex });
+  soilMaterial = soilMat;
   // Fields are fenced, with a gate gap on the path-facing side so
   // the farmer walks in through the opening, not through the rails.
   const FIELD_GAPS: Record<string, Partial<Record<'n' | 's' | 'e' | 'w', [number, number][]>>> = {
@@ -286,9 +309,30 @@ export function buildWorld(scene: THREE.Scene): void {
   scene.add(fenceRect(CHICKEN_PEN, { s: [[1.8, 3.5]] }));
   scene.add(fenceRect(COW_PEN, { s: [[3.2, 4.9]] }));
 
-  // Perimeter fence with a south gate gap at the entrance path.
+  // Perimeter fence with a south gate gap at the entrance path, and
+  // an east gap where the farm will one day expand (a barricade,
+  // added in main, blocks it until the first land purchase).
   const per: RectPx = { x: 12, y: 12, w: 1056, h: 1576 };
-  scene.add(fenceRect(per, { s: [[u(452 - 12), u(628 - 12)]] }));
+  scene.add(fenceRect(per, { s: [[u(452 - 12), u(628 - 12)]], e: [[u(800 - 12), u(890 - 12)]] }));
+
+  // The east expansion zone: extra grass, a crossing path, and the
+  // zone's own outer fence with a west gap at the crossing. The
+  // strips and the East Field get their fences when bought.
+  const grass2 = groundPlane(u(420), u(1600) + 8, grassMat);
+  grass2.position.x = X(1420);
+  scene.add(grass2);
+  const zonePaths: RectPx[] = [
+    { x: 1068, y: 800, w: 532, h: 90 },
+    { x: 1256, y: 140, w: 44, h: 1320 },
+  ];
+  zonePaths.forEach((r) => {
+    const { cx, cz, w, d } = rect3(r);
+    const p = groundPlane(w, d, pathMat, 0.01);
+    p.position.x = cx;
+    p.position.z = cz;
+    scene.add(p);
+  });
+  scene.add(fenceRect(EAST_ZONE, { w: [[u(800 - 140), u(890 - 140)]] }));
 
   // Stall and entrance sign.
   scene.add(makeStall());

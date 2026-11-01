@@ -1,6 +1,19 @@
 import * as THREE from 'three';
 import './ui/hud.css';
-import { buildWorld, WORLD_COLLIDERS, WORLD_MATS } from './three/World';
+import { buildWorld, WORLD_COLLIDERS, WORLD_MATS, addFieldVisuals } from './three/World';
+import { STRIP_RECTS, EAST_FIELD_RECT } from './game/Layout';
+import { LAND_PACK_COUNT, PLOTS_PER_PACK, landPackLevel, landPackPrice, EAST_FIELD } from './data/LandData';
+import {
+  COW_BASE,
+  COW_MAX_TIER,
+  HEN_BASE,
+  HEN_MAX_TIER,
+  cowLevel,
+  cowPrice,
+  henLevel,
+  henPrice,
+  troughCapacity,
+} from './data/AnimalData';
 import { MAT, box, makeFarmer, type FarmerRig } from './three/models';
 import { SPAWN, X, Z, u } from './game/Layout';
 import { HUD } from './ui/HUD';
@@ -38,6 +51,39 @@ sun.position.set(8, 18, 6);
 scene.add(sun);
 
 buildWorld(scene);
+
+// The east crossing starts barricaded (master prompt S3): crossed
+// planks on the old perimeter's east gap, removed by the first land
+// purchase out there. Its collider keeps the player honest until then.
+const barricade = new THREE.Group();
+{
+  const plankGeo = new THREE.BoxGeometry(0.18, 2.2, 0.5);
+  [-0.7, 0.7].forEach((off) => {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 1.1, 0.22), MAT.woodDark);
+    post.position.set(off, 0.55, 0);
+    barricade.add(post);
+  });
+  [0.35, 0.8].forEach((h, i) => {
+    const plank = new THREE.Mesh(plankGeo, MAT.wood);
+    plank.rotation.z = i === 0 ? 0.5 : -0.5;
+    plank.rotation.y = Math.PI / 2;
+    plank.position.set(0, h, 0);
+    barricade.add(plank);
+  });
+  barricade.position.set(X(1068), 0, Z(845));
+  scene.add(barricade);
+}
+const barricadeCollider = { minX: X(1068) - 0.25, maxX: X(1068) + 0.25, minZ: Z(795), maxZ: Z(895) };
+WORLD_COLLIDERS.push(barricadeCollider);
+let barricadeRemoved = false;
+function removeBarricade(): void {
+  if (barricadeRemoved) return;
+  barricadeRemoved = true;
+  barricade.visible = false;
+  const i = WORLD_COLLIDERS.indexOf(barricadeCollider);
+  if (i >= 0) WORLD_COLLIDERS.splice(i, 1);
+}
+
 const farmer: FarmerRig = makeFarmer();
 farmer.group.position.set(X(SPAWN.x), 0, Z(SPAWN.y));
 scene.add(farmer.group);
@@ -314,7 +360,7 @@ customers.onTimeout = (pos) => {
 };
 
 // Animals and their pickups.
-import { AnimalSystem3D, FEED_MAX } from './game/AnimalSystem3D';
+import { AnimalSystem3D } from './game/AnimalSystem3D';
 const animals = new AnimalSystem3D(scene);
 // The real CC0 cow model (Quaternius) replaces the procedural cows
 // when it arrives; the game runs either way.
@@ -352,7 +398,7 @@ function feedStep(dtMs: number): void {
     const tp = animals.troughPos(kind);
     const dx = playerPos.x - tp.x;
     const dz = playerPos.z - tp.z;
-    if (dx * dx + dz * dz < 1.7 * 1.7 && backpack.countOf('corn') > 0 && animals.feedOf(kind) < FEED_MAX) {
+    if (dx * dx + dz * dz < 1.7 * 1.7 && backpack.countOf('corn') > 0 && animals.feedOf(kind) < animals.feedMaxOf(kind)) {
       feedTimerMs += dtMs;
       while (feedTimerMs >= 260) {
         feedTimerMs -= 260;
@@ -364,7 +410,7 @@ function feedStep(dtMs: number): void {
         hud.setBag(backpack.total, backpack.capacity);
         floatAt('+1 🌽 feed', tp.x, tp.z, '#ffe066');
         Audio.playPickup();
-        if (backpack.countOf('corn') <= 0 || animals.feedOf(kind) >= FEED_MAX) break;
+        if (backpack.countOf('corn') <= 0 || animals.feedOf(kind) >= animals.feedMaxOf(kind)) break;
       }
       return;
     }
@@ -545,6 +591,49 @@ const upgrades = new UpgradeSystem();
 let southUnlocked = false;
 let helperHired = false;
 let churnOwned = false;
+let landPacks = 0;
+let eastUnlocked = false;
+
+// Camera celebration pan for land purchases (skippable by tapping).
+let panUntil = -1;
+let panPoint = new THREE.Vector3();
+function panTo(x: number, z: number, seconds = 1.2): void {
+  panPoint.set(x, 0, z);
+  panUntil = clock.elapsedTime + seconds;
+}
+renderer.domElement.addEventListener('pointerdown', () => {
+  panUntil = -1;
+});
+
+/** Builds one East Strip: fence, soil, plots, and (on purchase) the party. */
+function buildStrip(index: number, celebrate: boolean): void {
+  addFieldVisuals(scene, STRIP_RECTS[index], { w: [[u(62), u(138)]] });
+  cropField.plantStrip(scene, index);
+  removeBarricade();
+  if (celebrate) {
+    const c = STRIP_RECTS[index];
+    const wx = X(c.x + c.w / 2);
+    const wz = Z(c.y + c.h / 2);
+    panTo(wx, wz);
+    floatAt('🗺️ NEW LAND!', wx, wz, '#b8f7a1');
+    bursts.spawn(wx, wz, 0x7ec850, 12, 1.1);
+    Audio.playSuccess();
+  }
+}
+
+function buildEastField(celebrate: boolean): void {
+  addFieldVisuals(scene, EAST_FIELD_RECT, { w: [[u(192), u(268)]] });
+  cropField.plantEast(scene);
+  removeBarricade();
+  if (celebrate) {
+    const wx = X(EAST_FIELD_RECT.x + EAST_FIELD_RECT.w / 2);
+    const wz = Z(EAST_FIELD_RECT.y + EAST_FIELD_RECT.h / 2);
+    panTo(wx, wz);
+    floatAt('🗺️ EAST FIELD!', wx, wz, '#b8f7a1');
+    bursts.spawn(wx, wz, 0x7ec850, 16, 1.2);
+    Audio.playSuccess();
+  }
+}
 let cosmetics: CosmeticsState = { ...DEFAULT_COSMETICS, owned: [...DEFAULT_COSMETICS.owned] };
 
 /** Applies the equipped cosmetics: farmer colours, weather light, road tint. */
@@ -578,10 +667,10 @@ function panelBody(): HTMLElement {
   return hud.root.querySelector('#panel-body')!;
 }
 
-let shopTab: 'upgrades' | 'skins' | 'seeds' = 'upgrades';
+let shopTab: 'upgrades' | 'skins' | 'seeds' | 'land' | 'animals' = 'upgrades';
 
 function shopTabsHtml(): string {
-  return `<div class="tab-row"><button class="tab-btn ${shopTab === 'upgrades' ? 'on' : ''}" data-shop-tab="upgrades">⬆️ Upgrades</button><button class="tab-btn ${shopTab === 'seeds' ? 'on' : ''}" data-shop-tab="seeds">🌱 Seeds</button><button class="tab-btn ${shopTab === 'skins' ? 'on' : ''}" data-shop-tab="skins">🎨 Skins</button></div>`;
+  return `<div class="tab-row"><button class="tab-btn ${shopTab === 'upgrades' ? 'on' : ''}" data-shop-tab="upgrades">⬆️ Upgrades</button><button class="tab-btn ${shopTab === 'land' ? 'on' : ''}" data-shop-tab="land">🗺️ Land</button><button class="tab-btn ${shopTab === 'animals' ? 'on' : ''}" data-shop-tab="animals">🐔 Animals</button><button class="tab-btn ${shopTab === 'seeds' ? 'on' : ''}" data-shop-tab="seeds">🌱 Seeds</button><button class="tab-btn ${shopTab === 'skins' ? 'on' : ''}" data-shop-tab="skins">🎨 Skins</button></div>`;
 }
 
 function wireShopTabs(): void {
@@ -590,7 +679,7 @@ function wireShopTabs(): void {
     .forEach((btn) =>
       btn.addEventListener('click', () => {
         const tab = btn.getAttribute('data-shop-tab');
-        shopTab = tab === 'skins' ? 'skins' : tab === 'seeds' ? 'seeds' : 'upgrades';
+        shopTab = tab === 'skins' ? 'skins' : tab === 'seeds' ? 'seeds' : tab === 'land' ? 'land' : tab === 'animals' ? 'animals' : 'upgrades';
         Audio.playClick();
         renderShop();
       }),
@@ -604,6 +693,14 @@ function renderShop(): void {
   }
   if (shopTab === 'seeds') {
     renderSeeds();
+    return;
+  }
+  if (shopTab === 'land') {
+    renderLand();
+    return;
+  }
+  if (shopTab === 'animals') {
+    renderAnimals();
     return;
   }
   const rows = upgrades
@@ -723,6 +820,112 @@ hud.onSeedHint = () => {
   shopTab = 'seeds';
   renderShop();
 };
+
+/** The Animals tab: hen and cow extension tiers (master prompt S4). */
+function renderAnimals(): void {
+  const row = (
+    kind: 'chicken' | 'cow',
+    emoji: string,
+    name: string,
+    base: number,
+    maxTier: number,
+    priceOf: (t: number) => number,
+    levelOf: (t: number) => number,
+  ): string => {
+    const tier = animals.tierOf(kind);
+    const count = base + tier;
+    const trough = troughCapacity(tier);
+    if (tier >= maxTier) {
+      return `<div class="shop-row"><div class="shop-info"><div class="shop-name">${emoji} ${name} · ${count}</div><div class="shop-fx">Full flock: trough holds ${trough} corn</div></div><button class="buy-btn" disabled>MAX</button></div>`;
+    }
+    const price = priceOf(tier);
+    const need = levelOf(tier);
+    if (progression.level < need) {
+      return `<div class="shop-row"><div class="shop-info"><div class="shop-name">${emoji} ${name} · ${count}</div><div class="shop-fx">Next: ${count + 1} animals, trough ${troughCapacity(tier + 1)}</div></div><button class="buy-btn" disabled>🔒 Level ${need}</button></div>`;
+    }
+    return `<div class="shop-row"><div class="shop-info"><div class="shop-name">${emoji} ${name} · ${count}</div><div class="shop-fx">Next: ${count + 1} animals, trough ${troughCapacity(tier + 1)}</div></div><button class="buy-btn" data-animal-tier="${kind}" ${market.coins < price ? 'disabled' : ''}>🪙 ${price}</button></div>`;
+  };
+  hud.openPanel(
+    'Shop',
+    shopTabsHtml() +
+      row('chicken', '🐔', 'Hens', HEN_BASE, HEN_MAX_TIER, henPrice, henLevel) +
+      row('cow', '🐄', 'Cows', COW_BASE, COW_MAX_TIER, cowPrice, cowLevel),
+  );
+  wireShopTabs();
+  panelBody()
+    .querySelectorAll('[data-animal-tier]')
+    .forEach((btn) =>
+      btn.addEventListener('click', () => {
+        const kind = btn.getAttribute('data-animal-tier') as 'chicken' | 'cow';
+        const tier = animals.tierOf(kind);
+        const price = kind === 'chicken' ? henPrice(tier) : cowPrice(tier);
+        if (!market.spendCoins(price)) return Audio.playError();
+        animals.addTier(kind);
+        const pos = animals.troughPos(kind);
+        floatAt(kind === 'chicken' ? '🐔 +1 Hen!' : '🐄 +1 Cow!', pos.x, pos.z, '#ffd9a0');
+        Audio.playSuccess();
+        panTo(pos.x, pos.z, 1.0);
+        saveDirty = true;
+        renderAnimals();
+      }),
+    );
+}
+
+/** The Land tab: East Strip packs and the East Field (master prompt S3). */
+function renderLand(): void {
+  const rows: string[] = [];
+  for (let i = 0; i < LAND_PACK_COUNT; i++) {
+    const name = `East Strip ${i + 1}`;
+    if (i < landPacks) {
+      rows.push(`<div class="shop-row"><div class="shop-info"><div class="shop-name">🗺️ ${name}</div><div class="shop-fx">Yours: ${PLOTS_PER_PACK} corn plots growing east</div></div><button class="buy-btn" disabled>OWNED</button></div>`);
+    } else if (i > landPacks) {
+      rows.push(`<div class="shop-row"><div class="shop-info"><div class="shop-name">🗺️ ${name}</div><div class="shop-fx">Buy Strip ${i} first</div></div><button class="buy-btn" disabled>🔒 Order</button></div>`);
+    } else if (progression.level < landPackLevel(i)) {
+      rows.push(`<div class="shop-row"><div class="shop-info"><div class="shop-name">🗺️ ${name}</div><div class="shop-fx">${PLOTS_PER_PACK} more corn plots east of the farm</div></div><button class="buy-btn" disabled>🔒 Level ${landPackLevel(i)}</button></div>`);
+    } else {
+      const price = landPackPrice(i);
+      rows.push(`<div class="shop-row"><div class="shop-info"><div class="shop-name">🗺️ ${name}</div><div class="shop-fx">${PLOTS_PER_PACK} more corn plots east of the farm</div></div><button class="buy-btn" data-land-pack="${i}" ${market.coins < price ? 'disabled' : ''}>🪙 ${price}</button></div>`);
+    }
+  }
+  if (eastUnlocked) {
+    rows.push(`<div class="shop-row"><div class="shop-info"><div class="shop-name">🌾 East Field</div><div class="shop-fx">Yours: ${EAST_FIELD.plots} corn plots growing</div></div><button class="buy-btn" disabled>OWNED</button></div>`);
+  } else if (progression.level < EAST_FIELD.level) {
+    rows.push(`<div class="shop-row"><div class="shop-info"><div class="shop-name">🌾 East Field</div><div class="shop-fx">A whole new field of ${EAST_FIELD.plots} corn plots, past the strips</div></div><button class="buy-btn" disabled>🔒 Level ${EAST_FIELD.level}</button></div>`);
+  } else {
+    rows.push(`<div class="shop-row"><div class="shop-info"><div class="shop-name">🌾 East Field</div><div class="shop-fx">A whole new field of ${EAST_FIELD.plots} corn plots, past the strips</div></div><button class="buy-btn" data-buy-east="1" ${market.coins < EAST_FIELD.price ? 'disabled' : ''}>🪙 ${EAST_FIELD.price}</button></div>`);
+  }
+  hud.openPanel('Shop', shopTabsHtml() + rows.join(''));
+  wireShopTabs();
+  panelBody()
+    .querySelectorAll('[data-land-pack]')
+    .forEach((btn) =>
+      btn.addEventListener('click', () => {
+        const i = Number(btn.getAttribute('data-land-pack'));
+        if (i !== landPacks) return Audio.playError();
+        if (!market.spendCoins(landPackPrice(i))) return Audio.playError();
+        landPacks++;
+        buildStrip(i, true);
+        missions.track('area', undefined, 1);
+        saveDirty = true;
+        refreshObjective();
+        renderLand();
+      }),
+    );
+  panelBody()
+    .querySelectorAll('[data-buy-east]')
+    .forEach((btn) =>
+      btn.addEventListener('click', () => {
+        if (eastUnlocked) return Audio.playError();
+        if (!market.spendCoins(EAST_FIELD.price)) return Audio.playError();
+        eastUnlocked = true;
+        buildEastField(true);
+        missions.track('area', undefined, 1);
+        saveDirty = true;
+        refreshObjective();
+        renderLand();
+      }),
+    );
+}
 
 /** The Skins tab: farmer outfits, weather themes and road styles. */
 function renderSkins(): void {
@@ -938,11 +1141,14 @@ function collectSave(): GameSave {
     pendingCash: snap.pendingCash,
     xp: progression.xp,
     feed: animals.feedSnapshot(),
+    animalTiers: animals.tiersSnapshot(),
     helperHired,
     churnOwned,
     stock: snap.stock,
     backpack: backpack.snapshot(),
     seeds: seeds.snapshot(),
+    landPacks,
+    eastUnlocked,
     upgrades: upgrades.snapshot(),
     areaUnlocked: southUnlocked,
     missions: missions.snapshot(),
@@ -958,6 +1164,11 @@ function applySave(save: GameSave): void {
   seeds.restore(save.seeds);
   refreshSeeds();
   refreshLevel();
+  landPacks = save.landPacks;
+  eastUnlocked = save.eastUnlocked;
+  for (let i = 0; i < landPacks; i++) buildStrip(i, false);
+  if (eastUnlocked) buildEastField(false);
+  animals.setTiers(save.animalTiers);
   animals.restoreFeed(save.feed);
   helperHired = save.helperHired;
   churnOwned = save.churnOwned;
@@ -1131,7 +1342,7 @@ let facing = Math.PI; // facing the camera (south) at spawn
 let walkPhase = 0;
 let stepTimer = 0;
 
-const WORLD_BOUNDS = { minX: X(30), maxX: X(1050), minZ: Z(30), maxZ: Z(1570) };
+const WORLD_BOUNDS = { minX: X(30), maxX: X(1580), minZ: Z(30), maxZ: Z(1570) };
 const SPEED = 7.2;
 
 const clock = new THREE.Clock();
@@ -1148,7 +1359,13 @@ function animate(): void {
   for (let s = 0; s < steps; s++) stepGame(dt, t);
   bursts.update(rawDt);
 
-  camTarget.lerp(new THREE.Vector3(playerPos.x, 0, playerPos.z), Math.min(1, rawDt * 5));
+  // During a land-purchase celebration the camera glances at the
+  // new land instead of following the farmer (tap cancels early).
+  if (t < panUntil) {
+    camTarget.lerp(panPoint, Math.min(1, rawDt * 3));
+  } else {
+    camTarget.lerp(new THREE.Vector3(playerPos.x, 0, playerPos.z), Math.min(1, rawDt * 5));
+  }
   camera.position.set(camTarget.x + CAM_OFFSET.x, CAM_OFFSET.y, camTarget.z + CAM_OFFSET.z);
   camera.lookAt(camTarget.x, 0.8, camTarget.z - 1.5);
 
@@ -1296,12 +1513,14 @@ if (import.meta.env.MODE !== 'release') {
     crops: cropField,
     backpack,
     seeds,
+    land: () => ({ packs: landPacks, east: eastUnlocked }),
     missions,
     market,
     customers,
     animals,
     upgrades,
     progression,
+    gainXp,
     helper,
     boostActive: () => clock.elapsedTime < boostUntilT,
     helperHired: () => helperHired,

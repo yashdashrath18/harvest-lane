@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { makeCustomer, type CharacterRig } from '../three/models';
-import { FIELDS, STALL_FRONT, X, Z, type RectPx } from './Layout';
+import { FIELDS, STALL_FRONT, STRIP_RECTS, EAST_FIELD_RECT, X, Z, type RectPx } from './Layout';
 import type { CropField3D } from './CropField3D';
 
 /**
@@ -18,12 +18,23 @@ const GATE_PX: Record<string, { x: number; y: number }> = {
   B: { x: 452, y: 673 },
   CORN: { x: 628, y: 364 },
   SOUTH: { x: 452, y: 1178 },
+  EAST: { x: 1300, y: 400 },
 };
+STRIP_RECTS.forEach((s, i) => {
+  GATE_PX[`S${i}`] = { x: s.x, y: s.y + 100 };
+});
+
+/** Every plantable rect the helper can work, starter fields plus east land. */
+const ALL_FIELDS: Record<string, RectPx> = { ...FIELDS, EAST: EAST_FIELD_RECT };
+STRIP_RECTS.forEach((s, i) => {
+  ALL_FIELDS[`S${i}`] = s;
+});
+const isEast = (name: string | null): boolean => name === 'EAST' || (name !== null && name.startsWith('S'));
 const SPEED = 5.0;
 export const HELPER_CAPACITY = 8;
 
 function fieldOf(x: number, z: number): string | null {
-  for (const [name, r] of Object.entries(FIELDS) as [string, RectPx][]) {
+  for (const [name, r] of Object.entries(ALL_FIELDS) as [string, RectPx][]) {
     if (x >= X(r.x) - 0.2 && x <= X(r.x + r.w) + 0.2 && z >= Z(r.y) - 0.2 && z <= Z(r.y + r.h) + 0.2) {
       return name;
     }
@@ -75,6 +86,11 @@ export class HelperAI {
     if (here && here !== there) {
       const g = GATE_PX[here];
       pts.push({ x: X(g.x), z: Z(g.y) });
+    }
+    // Crossing between the old farm and the east land goes through
+    // the single gate in the two fences (design 1068, 845).
+    if (isEast(here) !== isEast(there)) {
+      pts.push({ x: X(1068), z: Z(845) });
     }
     if (there && there !== here) {
       const g = GATE_PX[there];

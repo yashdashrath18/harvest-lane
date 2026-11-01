@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CROPS, type CropDefinition } from '../data/CropData';
-import { FIELDS, X, Z, type RectPx } from '../game/Layout';
+import { FIELDS, EAST_FIELD_RECT, stripPlotRect, X, Z, type RectPx } from '../game/Layout';
 import { CROP_GEOMETRIES, CROP_MATERIAL } from '../three/crops';
 
 interface Crop {
@@ -70,6 +70,34 @@ export class CropField3D {
     plant(FIELDS.CORN, 'corn', 3);
     // SOUTH stays empty soil until it is unlocked (shop phase);
     // plantSouth() plants its carrots then.
+  }
+
+  /** Plants a bought East Strip (8 corn plots) or the East Field (60 corn). */
+  private plantRect(scene: THREE.Scene, rect: RectPx, cropId: string, phaseSeed: number): void {
+    plotPositions(rect).forEach((p, i) => {
+      const def = CROPS[cropId];
+      const mesh = new THREE.Mesh(CROP_GEOMETRIES[cropId][0], CROP_MATERIAL);
+      mesh.position.set(X(p.x), 0, Z(p.y));
+      scene.add(mesh);
+      const frac = ((i * 37 + phaseSeed * 91) % 100) / 100;
+      this.crops.push({
+        def,
+        x: X(p.x),
+        z: Z(p.y),
+        mesh,
+        grownMs: frac * def.growthTimeMs,
+        state: 'growing',
+        stage: -1,
+      });
+    });
+  }
+
+  plantStrip(scene: THREE.Scene, index: number): void {
+    this.plantRect(scene, stripPlotRect(index), 'corn', 10 + index);
+  }
+
+  plantEast(scene: THREE.Scene): void {
+    this.plantRect(scene, EAST_FIELD_RECT, 'corn', 20);
   }
 
   plantSouth(scene: THREE.Scene): void {
