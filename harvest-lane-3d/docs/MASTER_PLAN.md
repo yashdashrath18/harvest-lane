@@ -6,6 +6,16 @@ every system each feature touches, conflicts found, and the decisions taken
 before coding. Build order follows the prompt (1 to 9), tests after each
 section, one section shipped and verified at a time.
 
+**STATUS: COMPLETE, 2026-11-01.** All sections shipped and verified live
+the same day (commits 023e85de S1, 4217368c S2, e287ca4c S3+S4, 976bd594
+S5+S7, 1bd3a990 S6, f6696aed S8, plus the S9-11 close-out). The section
+reports are in PHASE_REPORTS.md; the economy write-up is docs/ECONOMY.md.
+Recorded deviations from the prompt: the level-up camera push-in was
+skipped (S1); the planting scatter animation became a soil puff plus
+sound (S2); animal pen fences do not physically grow (S4); the hotel
+stands in the east zone's south-east rather than beyond the bottom
+fence (S8, the east zone did not exist when that line was written).
+
 ## Where things live today (surveyed 2026-11-01)
 
 - XP and levels: `systems/ProgressionSystem.ts`, curve `round(40 * level^1.32)`,

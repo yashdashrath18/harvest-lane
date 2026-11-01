@@ -14,6 +14,8 @@ An original farming game built in code, with a small set of CC0 assets added in 
 
 A competition update on 2026-10-31 (built from a study of My Perfect Farm, Farm Land and My Mini Mart, and their player reviews) added the genre's proven systems, minus its most-hated one: **no forced ads, ever** (rewarded ads stay opt-in). New: farm levels and XP, a physical cash pile at the stall, animal feeding through troughs, daily missions, endless contracts after the base missions, a hireable AI helper, a cheese churn (milk 14 → cheese 42), customer waves with calm breaks, capped offline earnings with a welcome-back panel, a sneakers speed-boost pad, a corn-for-gems trade, a visible Saved indicator, and particle bursts on harvest, sale and level-up.
 
+The **Master Programme** update on 2026-11-01 rebuilt the game's long-term arc (plan in `docs/MASTER_PLAN.md`, economics in `docs/ECONOMY.md`): a 50-level progression system with an unlock roadmap (backpack space grows with level, LEVEL UP panels, per-action XP pricing); a **seed and replant loop** (harvest leaves bare soil, walk over it with seeds to replant, seed packs and a seed bag, an anti-softlock trickle so the farm can never dead-end); **land extensions** (six East Strip packs and the East Field, 108 extra corn plots east of a barricaded gate); **animal extensions** (hens 3 → 12, cows 2 → 8, troughs that grow per tier); a **harder economy** verified by an included simulator (`npm run sim` drives the real data files and checks the progression targets); a full **outfit system** (five categories, 26 pieces, hats/chains/glasses as real attachments, a live preview farmer in the shop); and the **Grand Hotel**, a locked landmark that unlocks at Level 10 with its future room system defined as data. A Reduce Motion setting caps the celebration effects, and particles are hard-capped for performance.
+
 ## How this edition differs
 
 - **Walk-over harvesting:** stepping on a ripe crop collects it (the 2D edition uses a harvest button near a highlighted crop)
@@ -23,7 +25,7 @@ A competition update on 2026-10-31 (built from a study of My Perfect Farm, Farm 
 
 ## Tech
 
-Three.js · TypeScript · Vite · Vitest (39 logic tests) · WebAudio-synthesized music, sampled CC0 SFX with synth fallback · YouTube Playables SDK adapter with cloud saves in the Playables environment and local saves on the web.
+Three.js · TypeScript · Vite · Vitest (67 logic tests) · WebAudio-synthesized music, sampled CC0 SFX with synth fallback · YouTube Playables SDK adapter with cloud saves in the Playables environment and local saves on the web.
 
 ## Status
 

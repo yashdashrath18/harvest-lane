@@ -45,6 +45,8 @@ export interface GameSave {
   animalTiers: { chicken: number; cow: number };
   /** The Grand Hotel landmark unlocked at Level 10 (master prompt S8). */
   hotelUnlocked: boolean;
+  /** Reduce Motion accessibility setting (master prompt S9). */
+  reduceMotion: boolean;
   upgrades: Record<string, number>;
   areaUnlocked: boolean;
   missions: {
@@ -216,6 +218,7 @@ function normalizeV1(raw: Record<string, unknown>): GameSave {
     eastUnlocked: raw.eastUnlocked === true,
     animalTiers: cleanAnimalTiers(raw.animalTiers),
     hotelUnlocked: raw.hotelUnlocked === true,
+    reduceMotion: raw.reduceMotion === true,
     upgrades: numberRecord(raw.upgrades),
     areaUnlocked: raw.areaUnlocked === true,
     missions: {

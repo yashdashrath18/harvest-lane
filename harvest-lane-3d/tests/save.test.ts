@@ -29,6 +29,7 @@ function sampleSave(): GameSave {
     eastUnlocked: false,
     animalTiers: { chicken: 3, cow: 1 },
     hotelUnlocked: false,
+    reduceMotion: false,
     upgrades: { backpack: 1, boots: 2 },
     areaUnlocked: true,
     missions: { progress: { 'harvest-30': 30, 'serve-10': 4 }, claimed: ['harvest-30'] },

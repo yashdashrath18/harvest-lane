@@ -82,6 +82,8 @@ const barricade = new THREE.Group();
 // barriered and signposted until Level 10 (master prompt S8).
 const hotel: HotelVisual = buildHotel(scene);
 let hotelUnlocked = false;
+/** Reduce Motion (S9): no particle bursts, no camera celebration pans. */
+let reduceMotion = false;
 function unlockHotel(animate: boolean): void {
   if (hotelUnlocked) return;
   hotelUnlocked = true;
@@ -177,11 +179,18 @@ interface BurstParticle {
   life: number;
 }
 class BurstPool {
+  /** Hard cap on live particles (master prompt 9: performance budget). */
+  static MAX_LIVE = 150;
+  /** Reduce Motion turns bursts off entirely. */
+  enabled = true;
   private parts: BurstParticle[] = [];
   private geo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
   private mats = new Map<number, THREE.Material>();
   constructor(private sceneRef: THREE.Scene) {}
   spawn(x: number, z: number, color: number, count = 10, y = 0.9): void {
+    if (!this.enabled) return;
+    count = Math.min(count, Math.max(0, BurstPool.MAX_LIVE - this.parts.length));
+    if (count <= 0) return;
     let mat = this.mats.get(color);
     if (!mat) {
       mat = new THREE.MeshLambertMaterial({ color });
@@ -623,6 +632,7 @@ let eastUnlocked = false;
 let panUntil = -1;
 let panPoint = new THREE.Vector3();
 function panTo(x: number, z: number, seconds = 1.2): void {
+  if (reduceMotion) return;
   panPoint.set(x, 0, z);
   panUntil = clock.elapsedTime + seconds;
 }
@@ -1161,7 +1171,8 @@ function renderSettings(): void {
     'Settings',
     `<div class="slider-row"><label>Music</label><input type="range" id="set-music" min="0" max="100" value="${Math.round(Audio.settings.musicVolume * 100)}"><span class="val" id="set-music-val"></span></div>
      <div class="slider-row"><label>SFX</label><input type="range" id="set-sfx" min="0" max="100" value="${Math.round(Audio.settings.sfxVolume * 100)}"><span class="val" id="set-sfx-val"></span></div>
-     <div class="earn-note">Volumes save automatically and apply live.</div>`,
+     <div class="slider-row"><label>Reduce motion</label><input type="checkbox" id="set-motion" ${reduceMotion ? 'checked' : ''}><span class="val">${reduceMotion ? 'ON' : 'OFF'}</span></div>
+     <div class="earn-note">Volumes save automatically and apply live. Reduce motion turns off particle bursts and camera celebration pans.</div>`,
   );
   const body = panelBody();
   const wire = (id: string, apply: (v: number) => void) => {
@@ -1177,6 +1188,14 @@ function renderSettings(): void {
   wire('set-sfx', (v) => {
     Audio.setSfxVolume(v);
     Audio.playClick();
+  });
+  const motion = body.querySelector('#set-motion') as HTMLInputElement;
+  motion.addEventListener('change', () => {
+    reduceMotion = motion.checked;
+    bursts.enabled = !reduceMotion;
+    saveDirty = true;
+    Audio.playClick();
+    renderSettings();
   });
 }
 
@@ -1284,6 +1303,7 @@ function collectSave(): GameSave {
     landPacks,
     eastUnlocked,
     hotelUnlocked,
+    reduceMotion,
     upgrades: upgrades.snapshot(),
     areaUnlocked: southUnlocked,
     missions: missions.snapshot(),
@@ -1303,6 +1323,8 @@ function collectSave(): GameSave {
 }
 
 function applySave(save: GameSave): void {
+  reduceMotion = save.reduceMotion;
+  bursts.enabled = !reduceMotion;
   market.restore({ coins: save.coins, gems: save.gems, stock: save.stock, pendingCash: save.pendingCash });
   progression.restore({ xp: save.xp });
   seeds.restore(save.seeds);
