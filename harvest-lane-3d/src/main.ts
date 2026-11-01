@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import './ui/hud.css';
 import { buildWorld, WORLD_COLLIDERS, WORLD_MATS, addFieldVisuals } from './three/World';
+import { applyOutfit } from './three/outfits';
+import { BASE_ITEMS, DEFAULT_OUTFIT, OUTFIT_CATEGORIES, outfitItem, outfitItemsIn, type OutfitCategory } from './data/OutfitData';
 import { STRIP_RECTS, EAST_FIELD_RECT } from './game/Layout';
 import { LAND_PACK_COUNT, PLOTS_PER_PACK, landPackLevel, landPackPrice, EAST_FIELD } from './data/LandData';
 import { CHURN_COST, CORN_PER_GEM, HELPER_COST, OFFLINE_CAP_HOURS, OFFLINE_MIN_MINUTES, offlineCoinsPerHour } from './data/EconomyData';
@@ -639,14 +641,7 @@ let cosmetics: CosmeticsState = { ...DEFAULT_COSMETICS, owned: [...DEFAULT_COSME
 
 /** Applies the equipped cosmetics: farmer colours, weather light, road tint. */
 function applyCosmetics(): void {
-  const f = farmerSkin(cosmetics.farmer);
-  if (farmer.mats) {
-    farmer.mats.shirt.color.setHex(f.shirt);
-    farmer.mats.denim.color.setHex(f.denim);
-    farmer.mats.hat.color.setHex(f.hat);
-    farmer.mats.hatDark.color.setHex(f.hatDark);
-    farmer.mats.band.color.setHex(f.band);
-  }
+  applyOutfit(farmer, cosmetics);
   const w = weatherSkin(cosmetics.weather);
   (scene.background as THREE.Color).setHex(w.bg);
   sun.color.setHex(w.sun);
@@ -954,10 +949,44 @@ function renderSkins(): void {
   const farmerRows = FARMER_SKINS.map((s) => row('farmer', s.id, s.name, s.blurb, [s.shirt, s.denim, s.hat], s.price)).join('');
   const weatherRows = WEATHER_SKINS.map((s) => row('weather', s.id, s.name, s.blurb, [s.bg, s.sun], s.price)).join('');
   const roadRows = ROAD_SKINS.map((s) => row('road', s.id, s.name, s.blurb, [s.tint], s.price)).join('');
+  // Outfit attachment rows (master prompt S6): base piece plus the
+  // purchasable items of each category.
+  const outfitRow = (cat: OutfitCategory, id: string, name: string, blurb: string, colors: number[], priceText: string, state: 'on' | 'equip' | 'buy' | 'locked', lockLabel = ''): string => {
+    const btn =
+      state === 'on'
+        ? '<button class="buy-btn" disabled>ON ✓</button>'
+        : state === 'equip'
+          ? `<button class="buy-btn claim" data-outfit-equip="${cat}:${id}">EQUIP</button>`
+          : state === 'locked'
+            ? `<button class="buy-btn" disabled>${lockLabel}</button>`
+            : `<button class="buy-btn" data-outfit-buy="${cat}:${id}">${priceText}</button>`;
+    const swatches = colors.map((c) => `<span class="sw" style="background:${hex(c)}"></span>`).join('');
+    return `<div class="shop-row"><div class="shop-info"><div class="shop-name">${name} <span class="swatches">${swatches}</span></div><div class="shop-fx">${blurb}</div></div>${btn}</div>`;
+  };
+  const outfitSections = OUTFIT_CATEGORIES.map((c) => {
+    const baseId = DEFAULT_OUTFIT[c.id];
+    const base = BASE_ITEMS[c.id];
+    let rows = outfitRow(c.id, baseId, base.name, base.blurb, [], '', cosmetics[c.id] === baseId ? 'on' : 'equip');
+    for (const item of outfitItemsIn(c.id)) {
+      const equipped = cosmetics[c.id] === item.id;
+      const owned = cosmetics.owned.includes(item.id);
+      const price: SkinPrice = { coins: item.coins, gems: item.gems };
+      if (equipped) rows += outfitRow(c.id, item.id, item.name, item.blurb, [item.color, item.accent], '', 'on');
+      else if (owned) rows += outfitRow(c.id, item.id, item.name, item.blurb, [item.color, item.accent], '', 'equip');
+      else if (item.level && progression.level < item.level)
+        rows += outfitRow(c.id, item.id, item.name, item.blurb, [item.color, item.accent], '', 'locked', `🔒 Level ${item.level}`);
+      else if (!afford(price))
+        rows += outfitRow(c.id, item.id, item.name, item.blurb, [item.color, item.accent], priceText(price), 'locked', priceText(price));
+      else rows += outfitRow(c.id, item.id, item.name, item.blurb, [item.color, item.accent], priceText(price), 'buy');
+    }
+    return `<div class="panel-sub">${c.icon} ${c.name}</div>` + rows;
+  }).join('');
   hud.openPanel(
     'Shop',
     shopTabsHtml() +
-      '<div class="panel-sub">🧑‍🌾 Farmer outfits</div>' + farmerRows +
+      '<div class="outfit-preview" id="outfit-preview-slot"></div>' +
+      '<div class="panel-sub">👕 Shirts</div>' + farmerRows +
+      outfitSections +
       '<div class="panel-sub">🌤️ Weather & light</div>' + weatherRows +
       '<div class="panel-sub">🛣️ Roads</div>' + roadRows,
   );
@@ -990,6 +1019,88 @@ function renderSkins(): void {
         renderShop();
       }),
     );
+  panelBody()
+    .querySelectorAll('[data-outfit-buy]')
+    .forEach((btn) =>
+      btn.addEventListener('click', () => {
+        const [cat, id] = btn.getAttribute('data-outfit-buy')!.split(':') as [OutfitCategory, string];
+        const item = outfitItem(id);
+        if (!item) return Audio.playError();
+        const paid = item.gems ? market.spendGems(item.gems) : item.coins ? market.spendCoins(item.coins) : true;
+        if (!paid) return Audio.playError();
+        cosmetics.owned.push(id);
+        cosmetics[cat] = id;
+        applyCosmetics();
+        saveDirty = true;
+        Audio.playSuccess();
+        renderShop();
+      }),
+    );
+  panelBody()
+    .querySelectorAll('[data-outfit-equip]')
+    .forEach((btn) =>
+      btn.addEventListener('click', () => {
+        const [cat, id] = btn.getAttribute('data-outfit-equip')!.split(':') as [OutfitCategory, string];
+        cosmetics[cat] = id;
+        applyCosmetics();
+        saveDirty = true;
+        Audio.playClick();
+        renderShop();
+      }),
+    );
+  startOutfitPreview();
+}
+
+/**
+ * The outfit preview (master prompt 6.3): a second tiny renderer
+ * with its own farmer, wearing exactly what the player wears (or
+ * just bought), turning slowly. Its canvas is a persistent element
+ * moved into the shop panel, so no GL contexts leak across renders;
+ * the loop idles whenever the canvas is not on screen.
+ */
+interface OutfitPreview {
+  renderer: THREE.WebGLRenderer;
+  scene: THREE.Scene;
+  camera: THREE.PerspectiveCamera;
+  rig: FarmerRig;
+  canvas: HTMLCanvasElement;
+}
+let outfitPreview: OutfitPreview | null = null;
+function startOutfitPreview(): void {
+  const slot = panelBody().querySelector('#outfit-preview-slot');
+  if (!slot) return;
+  if (!outfitPreview) {
+    const canvas = document.createElement('canvas');
+    canvas.id = 'outfit-canvas';
+    canvas.width = 300;
+    canvas.height = 300;
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setSize(150, 150, false);
+    const scene = new THREE.Scene();
+    scene.add(new THREE.HemisphereLight(0xfff6de, 0x8a6d3b, 1.1));
+    const key = new THREE.DirectionalLight(0xffffff, 1.2);
+    key.position.set(2, 4, 3);
+    scene.add(key);
+    const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 20);
+    camera.position.set(0, 1.6, 3.8);
+    camera.lookAt(0, 0.95, 0);
+    const rig = makeFarmer();
+    scene.add(rig.group);
+    outfitPreview = { renderer, scene, camera, rig, canvas };
+    let last = performance.now();
+    const loop = (now: number) => {
+      requestAnimationFrame(loop);
+      const p = outfitPreview!;
+      if (!document.body.contains(p.canvas)) return;
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      p.rig.group.rotation.y += dt * 0.9;
+      p.renderer.render(p.scene, p.camera);
+    };
+    requestAnimationFrame(loop);
+  }
+  applyOutfit(outfitPreview.rig, cosmetics);
+  slot.appendChild(outfitPreview.canvas);
 }
 
 function renderMissions(): void {
@@ -1153,7 +1264,16 @@ function collectSave(): GameSave {
     upgrades: upgrades.snapshot(),
     areaUnlocked: southUnlocked,
     missions: missions.snapshot(),
-    cosmetics: { owned: [...cosmetics.owned], farmer: cosmetics.farmer, weather: cosmetics.weather, road: cosmetics.road },
+    cosmetics: {
+      owned: [...cosmetics.owned],
+      farmer: cosmetics.farmer,
+      weather: cosmetics.weather,
+      road: cosmetics.road,
+      hat: cosmetics.hat,
+      shoes: cosmetics.shoes,
+      chain: cosmetics.chain,
+      glasses: cosmetics.glasses,
+    },
     player: { x: px.x, y: px.y },
     audio: { musicVolume: Audio.settings.musicVolume, sfxVolume: Audio.settings.sfxVolume },
   };
@@ -1173,7 +1293,16 @@ function applySave(save: GameSave): void {
   animals.restoreFeed(save.feed);
   helperHired = save.helperHired;
   churnOwned = save.churnOwned;
-  cosmetics = { owned: [...save.cosmetics.owned], farmer: save.cosmetics.farmer, weather: save.cosmetics.weather, road: save.cosmetics.road };
+  cosmetics = {
+    owned: [...save.cosmetics.owned],
+    farmer: save.cosmetics.farmer,
+    weather: save.cosmetics.weather,
+    road: save.cosmetics.road,
+    hat: save.cosmetics.hat,
+    shoes: save.cosmetics.shoes,
+    chain: save.cosmetics.chain,
+    glasses: save.cosmetics.glasses,
+  };
   applyCosmetics();
   helper.setActive(helperHired);
   churnGroup.visible = churnOwned;
@@ -1489,6 +1618,11 @@ function stepGame(dt: number, t: number): void {
   farmer.armL.rotation.x = -swing * 0.8;
   farmer.armR.rotation.x = swing * 0.8;
   farmer.body.position.y = 0.78 + (moving ? Math.abs(Math.sin(walkPhase)) * 0.07 : Math.sin(t * 2) * 0.015);
+  // A worn chain sways against the walk (master prompt 6.3).
+  if (farmer.chainSlot) {
+    farmer.chainSlot.rotation.x = moving ? Math.sin(walkPhase * 2) * 0.07 : Math.sin(t * 2) * 0.02;
+    farmer.chainSlot.rotation.z = moving ? Math.sin(walkPhase) * 0.05 : 0;
+  }
 }
 animate();
 

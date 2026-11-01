@@ -13,6 +13,7 @@
  */
 
 import { allSkinIds, FARMER_SKINS, WEATHER_SKINS, ROAD_SKINS } from '../data/SkinData';
+import { allOutfitIds, DEFAULT_OUTFIT, outfitItem, type OutfitCategory } from '../data/OutfitData';
 
 export const SAVE_VERSION = 2;
 const SAVE_KEY = 'harvest-lane-save:game-save';
@@ -70,7 +71,16 @@ export interface GameSave {
   player: { x: number; y: number };
   audio: { musicVolume: number; sfxVolume: number };
   /** Owned and equipped cosmetics (shop Skins tab). */
-  cosmetics: { owned: string[]; farmer: string; weather: string; road: string };
+  cosmetics: {
+    owned: string[];
+    farmer: string;
+    weather: string;
+    road: string;
+    hat: string;
+    shoes: string;
+    chain: string;
+    glasses: string;
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -141,8 +151,8 @@ function cleanAnimalTiers(value: unknown): GameSave['animalTiers'] {
 /** Sanitises the cosmetics block against the SkinData catalogue: unknown ids drop out, the three free defaults are always owned, and each equipped slot falls back to its default when invalid or unowned. */
 function cleanCosmetics(value: unknown): GameSave['cosmetics'] {
   const raw = isRecord(value) ? value : {};
-  const valid = new Set(allSkinIds());
-  const owned = new Set<string>(['classic', 'day', 'sand']);
+  const valid = new Set([...allSkinIds(), ...allOutfitIds()]);
+  const owned = new Set<string>(['classic', 'day', 'sand', 'hat-straw', 'shoe-brown', 'chain-none', 'glass-none']);
   if (Array.isArray(raw.owned)) {
     for (const id of raw.owned) {
       if (typeof id === 'string' && valid.has(id)) owned.add(id);
@@ -150,11 +160,17 @@ function cleanCosmetics(value: unknown): GameSave['cosmetics'] {
   }
   const pick = (v: unknown, fallback: string, ok: (id: string) => boolean): string =>
     typeof v === 'string' && ok(v) && owned.has(v) ? v : fallback;
+  const inCategory = (cat: string) => (id: string) =>
+    id === DEFAULT_OUTFIT[cat as OutfitCategory] || outfitItem(id)?.category === cat;
   return {
     owned: [...owned],
     farmer: pick(raw.farmer, 'classic', (id) => FARMER_SKINS.some((s) => s.id === id)),
     weather: pick(raw.weather, 'day', (id) => WEATHER_SKINS.some((s) => s.id === id)),
     road: pick(raw.road, 'sand', (id) => ROAD_SKINS.some((s) => s.id === id)),
+    hat: pick(raw.hat, 'hat-straw', inCategory('hat')),
+    shoes: pick(raw.shoes, 'shoe-brown', inCategory('shoes')),
+    chain: pick(raw.chain, 'chain-none', inCategory('chain')),
+    glasses: pick(raw.glasses, 'glass-none', inCategory('glasses')),
   };
 }
 

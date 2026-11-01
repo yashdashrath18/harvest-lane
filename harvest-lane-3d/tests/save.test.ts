@@ -33,7 +33,16 @@ function sampleSave(): GameSave {
     missions: { progress: { 'harvest-30': 30, 'serve-10': 4 }, claimed: ['harvest-30'] },
     player: { x: 300, y: 700 },
     audio: { musicVolume: 0.4, sfxVolume: 0.8 },
-    cosmetics: { owned: ['classic', 'day', 'sand', 'ocean', 'dusk'], farmer: 'ocean', weather: 'dusk', road: 'sand' },
+    cosmetics: {
+      owned: ['classic', 'day', 'sand', 'hat-straw', 'shoe-brown', 'chain-none', 'glass-none', 'ocean', 'dusk', 'hat-cap', 'chain-gold'],
+      farmer: 'ocean',
+      weather: 'dusk',
+      road: 'sand',
+      hat: 'hat-cap',
+      shoes: 'shoe-brown',
+      chain: 'chain-gold',
+      glasses: 'glass-none',
+    },
   };
 }
 
@@ -139,7 +148,16 @@ describe('cosmetics in saves', () => {
     const legacy = sampleSave() as unknown as Record<string, unknown>;
     delete legacy.cosmetics;
     const save = validateSave(legacy);
-    expect(save!.cosmetics).toEqual({ owned: ['classic', 'day', 'sand'], farmer: 'classic', weather: 'day', road: 'sand' });
+    expect(save!.cosmetics).toEqual({
+      owned: ['classic', 'day', 'sand', 'hat-straw', 'shoe-brown', 'chain-none', 'glass-none'],
+      farmer: 'classic',
+      weather: 'day',
+      road: 'sand',
+      hat: 'hat-straw',
+      shoes: 'shoe-brown',
+      chain: 'chain-none',
+      glasses: 'glass-none',
+    });
   });
 
   it('drops unknown skin ids and unequips unowned or cross-category ids', () => {

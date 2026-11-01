@@ -99,6 +99,16 @@ export interface FarmerRig {
   armL: THREE.Object3D;
   armR: THREE.Object3D;
   body: THREE.Object3D;
+  /** The head group, present on the player farmer (hat and glasses slots). */
+  head?: THREE.Group;
+  /** The two boot meshes, present on the player farmer (shoes slot). */
+  boots?: THREE.Mesh[];
+  /** The farmer's original hat meshes, hidden when another hat is worn. */
+  hatMeshes?: THREE.Object3D[];
+  /** Attachment anchors filled by the outfit builders (src/three/outfits.ts). */
+  hatSlot?: THREE.Group;
+  chainSlot?: THREE.Group;
+  glassesSlot?: THREE.Group;
   /** Recolourable materials, present on the player farmer only (skins). */
   mats?: {
     shirt: THREE.MeshLambertMaterial;
@@ -106,6 +116,8 @@ export interface FarmerRig {
     hat: THREE.MeshLambertMaterial;
     hatDark: THREE.MeshLambertMaterial;
     band: THREE.MeshLambertMaterial;
+    boot: THREE.MeshLambertMaterial;
+    bootAccent: THREE.MeshLambertMaterial;
   };
 }
 
@@ -327,13 +339,17 @@ export function makeFarmer(): FarmerRig {
     hat: MAT.straw.clone(),
     hatDark: MAT.strawDark.clone(),
     band: new THREE.MeshLambertMaterial({ color: 0xb5502f }),
+    boot: MAT.boot.clone(),
+    bootAccent: new THREE.MeshLambertMaterial({ color: 0xffffff }),
   };
 
+  const boots: THREE.Mesh[] = [];
   const mkLeg = (side: number): THREE.Group => {
     const hip = new THREE.Group();
     hip.position.set(0.16 * side, 0.78, 0);
     const leg = box(0.24, 0.62, 0.26, mats.denim, 0, -0.28, 0);
-    const bootMesh = box(0.26, 0.16, 0.4, MAT.boot, 0, -0.62, 0.05);
+    const bootMesh = box(0.26, 0.16, 0.4, mats.boot, 0, -0.62, 0.05);
+    boots.push(bootMesh as THREE.Mesh);
     hip.add(leg, bootMesh);
     group.add(hip);
     return hip;
@@ -374,5 +390,5 @@ export function makeFarmer(): FarmerRig {
   body.add(head);
   group.add(body);
   group.add(blobShadow(0.55));
-  return { group, legL, legR, armL, armR, body, mats };
+  return { group, legL, legR, armL, armR, body, head, boots, hatMeshes: [brim, crown, band], mats };
 }

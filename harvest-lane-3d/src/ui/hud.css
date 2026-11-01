@@ -132,3 +132,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #79b73f; f
   .stock-chip { bottom: 118px; font-size: 14px; }
   .seed-hint { bottom: 170px; }
 }
+
+/* Outfit preview (S6): the little turning farmer in the Skins tab. */
+.outfit-preview { display: flex; justify-content: center; padding: 2px 0 4px; }
+#outfit-canvas { width: 150px; height: 150px; }

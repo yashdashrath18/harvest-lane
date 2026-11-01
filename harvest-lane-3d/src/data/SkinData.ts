@@ -78,13 +78,22 @@ export interface CosmeticsState {
   farmer: string;
   weather: string;
   road: string;
+  /** Outfit attachment slots (master prompt S6, OutfitData). */
+  hat: string;
+  shoes: string;
+  chain: string;
+  glasses: string;
 }
 
 export const DEFAULT_COSMETICS: CosmeticsState = {
-  owned: ['classic', 'day', 'sand'],
+  owned: ['classic', 'day', 'sand', 'hat-straw', 'shoe-brown', 'chain-none', 'glass-none'],
   farmer: 'classic',
   weather: 'day',
   road: 'sand',
+  hat: 'hat-straw',
+  shoes: 'shoe-brown',
+  chain: 'chain-none',
+  glasses: 'glass-none',
 };
 
 export function farmerSkin(id: string): FarmerSkin {
