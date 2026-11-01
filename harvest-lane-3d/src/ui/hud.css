@@ -1,7 +1,7 @@
 /* Harvest Lane 3D HUD: DOM overlay in the cream, wood and ribbon
    style of the 2D game's converted interface. */
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { width: 100%; height: 100%; overflow: hidden; background: #79b73f; font-family: Arial, sans-serif; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #79b73f; font-family: Arial, sans-serif; color-scheme: light only; }
 #app { position: fixed; inset: 0; }
 #app canvas { display: block; }
 #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }

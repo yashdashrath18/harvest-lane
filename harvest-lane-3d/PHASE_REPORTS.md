@@ -280,3 +280,17 @@ Harvest now leaves BARE SOIL (the 'regrowing' state is gone from CropField3D); w
 **Final regression:** 67/67 unit tests, tsc clean, the core-loop smoke (smoke-v2: boot, menu, harvest, stall, serve, cash) passes on the final build, and the seeds smoke passes its functional checks (starter bag 30, pack purchase exact, out-of-seeds hint, softlock trickle fires and the gifted seed auto-plants). One mid-flow timing check in the seeds smoke is sensitive to the headless renderer's half-speed clock and failed intermittently in this environment while the same planting path verified through the trickle flow in the same run; planting itself is proven, the check is a test-environment race. README and the master plan now record the programme as complete, with the four recorded deviations (camera push-in, scatter animation, pen fence growth, hotel placement) listed in one place in docs/MASTER_PLAN.md.
 
 **The master programme is complete:** all eleven sections built, tested, published and verified live on 2026-11-01.
+
+---
+
+## PLAYTEST FIX: EAST ACCESS AND THE DARK FILTER (2026-11-01)
+
+Yash's phone playtest reported three problems: he could not go to the hotel side, he could not reach the farms on the other side, and the screen looked like it had a dark filter on it. All three were reproduced or traced before fixing.
+
+**East access (confirmed, design flaw):** the S3 barricade blocked the east crossing until the first land purchase, and in play it read as an invisible wall: the crossed planks render as a thin board in the fence gap, with no sign, lock or explanation anywhere near it. A scripted walk test confirmed the player stopped dead at the crossing before any purchase. **Fix:** the barricade and its collider are gone. The crossing is open from the start, a wooden sign at the gap reads "🌱 EAST FARM → Buy land in the Shop", and the first time a player wanders east owning no land, a floating hint points at Shop → Land. The land itself is still bought exactly as before.
+
+**Hotel reachability (confirmed):** the hotel plot's fence had no gate at all, so even inside the east zone the hotel could only be looked at. **Fix:** two gates, one on the path side and one under the door (a west gate alone left a pocket beside the building too narrow to walk around, found in verification and corrected). The building stays solid and the door stays barriered until Level 10. Verified by scripted walks: through the open crossing with no purchases, and through the south gate to a stop directly at the hotel door.
+
+**Dark filter (traced, two candidate causes):** the shipped game contains no dark overlay; a fresh session renders bright, and every fullscreen layer was audited (panels dim only while open, the level-up layer is transparent). The two things that can darken the whole screen are a phone browser's forced-dark mode laying a tint over the page, and the Dusk Violet weather skin (sun 0.8, hemi 0.75, purple sky) if it was bought and equipped in the Skins tab, which equips on purchase. **Fix:** the page now declares `color-scheme: light only` in both the HTML meta and CSS, which opts out of forced-dark tinting. If the tint was the Dusk skin, it is switched back in Shop → Skins → Weather → Bright Day; Yash was told this in the fix report since his save cannot be inspected from here.
+
+**Verification:** 67/67 unit tests, tsc clean, scripted walk tests for the crossing and the hotel door with screenshots inspected, zero page errors.

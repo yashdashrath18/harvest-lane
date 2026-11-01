@@ -57,27 +57,42 @@ scene.add(sun);
 
 buildWorld(scene);
 
-// The east crossing starts barricaded (master prompt S3): crossed
-// planks on the old perimeter's east gap, removed by the first land
-// purchase out there. Its collider keeps the player honest until then.
-const barricade = new THREE.Group();
+// The east crossing is OPEN (playtest fix, 2026-11-01): the S3
+// barricade read as an invisible wall and players could not even go
+// and look at the east land or the hotel. The crossing now carries a
+// sign instead, and the land itself is still bought in the Shop.
 {
-  const plankGeo = new THREE.BoxGeometry(0.18, 2.2, 0.5);
-  [-0.7, 0.7].forEach((off) => {
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 1.1, 0.22), MAT.woodDark);
-    post.position.set(off, 0.55, 0);
-    barricade.add(post);
-  });
-  [0.35, 0.8].forEach((h, i) => {
-    const plank = new THREE.Mesh(plankGeo, MAT.wood);
-    plank.rotation.z = i === 0 ? 0.5 : -0.5;
-    plank.rotation.y = Math.PI / 2;
-    plank.position.set(0, h, 0);
-    barricade.add(plank);
-  });
-  barricade.position.set(X(1068), 0, Z(845));
-  scene.add(barricade);
+  const sign = new THREE.Group();
+  const legL = box(0.14, 1.5, 0.14, MAT.woodDark, -1.1, 0.75, 0);
+  const legR = box(0.14, 1.5, 0.14, MAT.woodDark, 1.1, 0.75, 0);
+  sign.add(legL, legR);
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 176;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#fff6df';
+  ctx.fillRect(0, 0, 512, 176);
+  ctx.strokeStyle = '#8a5a2b';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(8, 8, 496, 160);
+  ctx.fillStyle = '#5b3a1a';
+  ctx.textAlign = 'center';
+  ctx.font = '900 56px sans-serif';
+  ctx.fillText('🌱 EAST FARM →', 256, 76);
+  ctx.font = '700 38px sans-serif';
+  ctx.fillStyle = '#3e7d32';
+  ctx.fillText('Buy land in the Shop', 256, 136);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const board = new THREE.Mesh(new THREE.BoxGeometry(2.9, 1.0, 0.08), new THREE.MeshLambertMaterial({ map: tex }));
+  board.position.y = 1.6;
+  sign.add(board);
+  sign.position.set(X(1024), 0, Z(786));
+  sign.rotation.y = -0.45;
+  scene.add(sign);
 }
+/** One-time pointer the first time a player wanders east with no land yet. */
+let eastHintShown = false;
 // The Grand Hotel landmark stands in the east zone from day one,
 // barriered and signposted until Level 10 (master prompt S8).
 const hotel: HotelVisual = buildHotel(scene);
@@ -97,17 +112,6 @@ function unlockHotel(animate: boolean): void {
     Audio.playSuccess();
     saveDirty = true;
   }
-}
-
-const barricadeCollider = { minX: X(1068) - 0.25, maxX: X(1068) + 0.25, minZ: Z(795), maxZ: Z(895) };
-WORLD_COLLIDERS.push(barricadeCollider);
-let barricadeRemoved = false;
-function removeBarricade(): void {
-  if (barricadeRemoved) return;
-  barricadeRemoved = true;
-  barricade.visible = false;
-  const i = WORLD_COLLIDERS.indexOf(barricadeCollider);
-  if (i >= 0) WORLD_COLLIDERS.splice(i, 1);
 }
 
 const farmer: FarmerRig = makeFarmer();
@@ -644,7 +648,6 @@ renderer.domElement.addEventListener('pointerdown', () => {
 function buildStrip(index: number, celebrate: boolean): void {
   addFieldVisuals(scene, STRIP_RECTS[index], { w: [[u(62), u(138)]] });
   cropField.plantStrip(scene, index);
-  removeBarricade();
   if (celebrate) {
     const c = STRIP_RECTS[index];
     const wx = X(c.x + c.w / 2);
@@ -659,7 +662,6 @@ function buildStrip(index: number, celebrate: boolean): void {
 function buildEastField(celebrate: boolean): void {
   addFieldVisuals(scene, EAST_FIELD_RECT, { w: [[u(192), u(268)]] });
   cropField.plantEast(scene);
-  removeBarricade();
   if (celebrate) {
     const wx = X(EAST_FIELD_RECT.x + EAST_FIELD_RECT.w / 2);
     const wz = Z(EAST_FIELD_RECT.y + EAST_FIELD_RECT.h / 2);
@@ -1587,6 +1589,11 @@ function stepGame(dt: number, t: number): void {
     if (!hitsCollider(nx, playerPos.z)) playerPos.x = nx;
     const nz = THREE.MathUtils.clamp(playerPos.z + mz * speed * mag * dt, WORLD_BOUNDS.minZ, WORLD_BOUNDS.maxZ);
     if (!hitsCollider(playerPos.x, nz)) playerPos.z = nz;
+    // First wander into the east zone with no land yet: point at the Shop.
+    if (!eastHintShown && landPacks === 0 && !eastUnlocked && playerPos.x > X(1075)) {
+      eastHintShown = true;
+      floatAt('🗺️ East Farm! Buy land in Shop → Land', playerPos.x, playerPos.z - 1.6, '#b8f7a1');
+    }
     const targetFacing = Math.atan2(mx, mz);
     let diff = targetFacing - facing;
     while (diff > Math.PI) diff -= Math.PI * 2;
