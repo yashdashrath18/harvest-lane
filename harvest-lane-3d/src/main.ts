@@ -3,6 +3,7 @@ import './ui/hud.css';
 import { buildWorld, WORLD_COLLIDERS, WORLD_MATS, addFieldVisuals } from './three/World';
 import { STRIP_RECTS, EAST_FIELD_RECT } from './game/Layout';
 import { LAND_PACK_COUNT, PLOTS_PER_PACK, landPackLevel, landPackPrice, EAST_FIELD } from './data/LandData';
+import { CHURN_COST, CORN_PER_GEM, HELPER_COST, OFFLINE_CAP_HOURS, OFFLINE_MIN_MINUTES, offlineCoinsPerHour } from './data/EconomyData';
 import {
   COW_BASE,
   COW_MAX_TIER,
@@ -722,12 +723,12 @@ function renderShop(): void {
       : `<div class="shop-row"><div class="shop-info"><div class="shop-name">South Field</div><div class="shop-fx">${SOUTH_FIELD.blurb}</div></div><button class="buy-btn" data-buy="south-field" ${market.coins < SOUTH_FIELD.cost ? 'disabled' : ''}>🪙 ${SOUTH_FIELD.cost}</button></div>`;
   const helperRow = helperHired
     ? '<div class="shop-row"><div class="shop-info"><div class="shop-name">Farm Helper 🧑‍🌾</div><div class="shop-fx">Working your fields: harvests ripe crops and stocks the stall</div></div><button class="buy-btn" disabled>HIRED</button></div>'
-    : `<div class="shop-row"><div class="shop-info"><div class="shop-name">Farm Helper 🧑‍🌾</div><div class="shop-fx">Harvests ripe crops and stocks the stall for you, all day</div></div><button class="buy-btn" data-buy="helper" ${market.coins < 300 ? 'disabled' : ''}>🪙 300</button></div>`;
+    : `<div class="shop-row"><div class="shop-info"><div class="shop-name">Farm Helper 🧑‍🌾</div><div class="shop-fx">Harvests ripe crops and stocks the stall for you, all day</div></div><button class="buy-btn" data-buy="helper" ${market.coins < HELPER_COST ? 'disabled' : ''}>🪙 ${HELPER_COST}</button></div>`;
   const churnRow = churnOwned
     ? '<div class="shop-row"><div class="shop-info"><div class="shop-name">Cheese Churn 🧀</div><div class="shop-fx">Built by the stall: stand at it with milk to churn cheese (sells for 42)</div></div><button class="buy-btn" disabled>BUILT</button></div>'
     : progression.level < 6
       ? '<div class="shop-row"><div class="shop-info"><div class="shop-name">Cheese Churn 🧀</div><div class="shop-fx">Turn 1 milk (14) into 1 cheese (42)</div></div><button class="buy-btn" disabled>🔒 Level 6</button></div>'
-      : `<div class="shop-row"><div class="shop-info"><div class="shop-name">Cheese Churn 🧀</div><div class="shop-fx">Turn 1 milk (14) into 1 cheese (42). Customers will start ordering it</div></div><button class="buy-btn" data-buy="churn" ${market.coins < 400 ? 'disabled' : ''}>🪙 400</button></div>`;
+      : `<div class="shop-row"><div class="shop-info"><div class="shop-name">Cheese Churn 🧀</div><div class="shop-fx">Turn 1 milk (14) into 1 cheese (42). Customers will start ordering it</div></div><button class="buy-btn" data-buy="churn" ${market.coins < CHURN_COST ? 'disabled' : ''}>🪙 ${CHURN_COST}</button></div>`;
   hud.openPanel('Shop', shopTabsHtml() + rows + south + helperRow + churnRow);
   wireShopTabs();
   panelBody()
@@ -750,7 +751,7 @@ function renderShop(): void {
           return;
         }
         if (id === 'helper') {
-          if (!market.spendCoins(300)) return Audio.playError();
+          if (!market.spendCoins(HELPER_COST)) return Audio.playError();
           helperHired = true;
           helper.setActive(true);
           saveDirty = true;
@@ -760,7 +761,7 @@ function renderShop(): void {
           return;
         }
         if (id === 'churn') {
-          if (!market.spendCoins(400)) return Audio.playError();
+          if (!market.spendCoins(CHURN_COST)) return Audio.playError();
           churnOwned = true;
           churnGroup.visible = true;
           customers.allowCheese = true;
@@ -1055,7 +1056,7 @@ function renderEarn(kind: keyof typeof EARN_OFFERS): void {
   const trade =
     kind === 'gems'
       ? `<div class="earn-note">Or trade surplus corn, no ad needed:</div>
-         <button class="watch-btn" id="btn-trade" ${backpack.countOf('corn') < 9 ? 'disabled' : ''}>Trade 9 🌽 → 1 💎 (you have ${backpack.countOf('corn')} 🌽)</button>`
+         <button class="watch-btn" id="btn-trade" ${backpack.countOf('corn') < CORN_PER_GEM ? 'disabled' : ''}>Trade ${CORN_PER_GEM} 🌽 → 1 💎 (you have ${backpack.countOf('corn')} 🌽)</button>`
       : '';
   hud.openPanel(
     kind === 'coins' ? 'Earn Coins' : 'Earn Gems',
@@ -1066,7 +1067,7 @@ function renderEarn(kind: keyof typeof EARN_OFFERS): void {
   );
   if (kind === 'gems') {
     panelBody().querySelector('#btn-trade')?.addEventListener('click', () => {
-      if (backpack.remove('corn', 9) < 9) return Audio.playError();
+      if (backpack.remove('corn', CORN_PER_GEM) < CORN_PER_GEM) return Audio.playError();
       market.addGems(1);
       hud.setBag(backpack.total, backpack.capacity);
       Audio.playSuccess();
@@ -1234,9 +1235,9 @@ let pendingWelcome: number | null = null;
 function queueOfflineEarnings(save: GameSave): void {
   if (!save.savedAt) return;
   const awayMs = Date.now() - save.savedAt;
-  if (awayMs < 15 * 60_000) return;
-  const hours = Math.min(awayMs / 3_600_000, 4);
-  const grant = Math.floor(hours * (12 + progression.level * 3));
+  if (awayMs < OFFLINE_MIN_MINUTES * 60_000) return;
+  const hours = Math.min(awayMs / 3_600_000, OFFLINE_CAP_HOURS);
+  const grant = Math.floor(hours * offlineCoinsPerHour(progression.level));
   if (grant >= 5) pendingWelcome = grant;
 }
 

@@ -9,7 +9,7 @@ describe('UpgradeSystem purchases', () => {
     market.addCoins(100);
     expect(upgrades.buy('backpack', market)).toBe(true);
     expect(upgrades.level('backpack')).toBe(1);
-    expect(market.coins).toBe(60); // first backpack level costs 40
+    expect(market.coins).toBe(45); // first backpack level costs 55 (S5 pass)
     expect(upgrades.backpackCapacity()).toBe(16);
   });
 
@@ -32,7 +32,7 @@ describe('UpgradeSystem purchases', () => {
     expect(upgrades.buy('boots', market)).toBe(false);
     expect(upgrades.level('boots')).toBe(3);
     expect(upgrades.speedMultiplier()).toBeCloseTo(1.36);
-    expect(market.coins).toBe(1000 - 35 - 80 - 160);
+    expect(market.coins).toBe(1000 - 50 - 110 - 225);
   });
 
   it('price multiplier raises serve earnings', () => {

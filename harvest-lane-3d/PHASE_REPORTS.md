@@ -242,3 +242,13 @@ Harvest now leaves BARE SOIL (the 'regrowing' state is gone from CropField3D); w
 **Verification:** 62 unit tests (3 new animal data tests), tsc clean. Browser smoke: buying hen tier 1 (80) took hens 3 → 4 and the trough 20 → 25; cow tier 1 (200) took cows 2 → 3 with the same capacity growth; zero page errors; pen screenshot inspected (new hen and eggs visible, GLB cows in the cow pen).
 
 **Process note:** a probe that granted XP through the raw progression hook made the HUD badge look stale; investigation showed every real XP award flows through `gainXp()`, which refreshes the badge, capacity and panel correctly (verified: Lv 7 badge, 266/303 XP, capacity 16, panel shown). The hook now exposes `gainXp` so future tests use the real path. No game change was needed.
+
+---
+
+## MASTER PROGRAMME SECTIONS 5 + 7: HARDER ECONOMY AND THE SIMULATOR (2026-11-01)
+
+**What shipped:** The S5 data pass per prompt 5: upgrade tracks repriced to 1.4x base rounded to 5 (Backpack 55/125/250, Boots 50/110/225, Fertilizer 65/140/280, Charm 70/155/310; South Field 150 to 210); Helper 300 to 450 and Cheese Churn 400 to 600, both moved into the new `src/data/EconomyData.ts` along with the offline formula; the corn-for-gems trade now takes 12 corn. Owned upgrades are unaffected, only future purchases pay more. Then the S7 simulator (`npm run sim`, scripts/simulate.mjs, tsx added as a devDependency): it drives the real data files through a documented casual-player model (25 min/day, wave-limited sales, the replant loop's time tax, one purchase a day) and asserts the prompt 5.1 bands. Full write-up in docs/ECONOMY.md.
+
+**Simulator result: all 7 target checks pass** on the live data. Day 1 wallet 68 (band 40-120), South Field day 3 (2-5), Helper day 5 (3-6), first land pack day 8 (4-8), Level 10 day 13 (12-20), 59 gems by day 30 (15+), wallet never negative. The before/after table shows the pass tightens the day-30 wallet (369 to 205) while progression milestones hold, because the model player keeps reinvesting.
+
+**Honest process notes:** the first runs missed two bands (day 1 too rich, Level 10 at day 6-7). Rather than only tuning game numbers, the misses exposed three modelling errors, each fixed with a documented reason: animal products were an unrealistic share of a casual player's sales, the model ignored the replant loop's time cost, and sales ignored the customer-wave demand cap. After those corrections the bands pass on the shipped prices without further game changes. The simulator is a model with stated assumptions, not a measurement of real players; its constants live in the script header for anyone to challenge.

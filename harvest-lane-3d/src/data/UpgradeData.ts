@@ -16,25 +16,25 @@ export const UPGRADE_TRACKS: UpgradeTrack[] = [
     id: 'backpack',
     name: 'Backpack',
     blurb: 'Carry more produce per trip',
-    costs: [40, 90, 180],
+    costs: [55, 125, 250], // master prompt S5: base costs x1.4, rounded to 5
   },
   {
     id: 'boots',
     name: 'Swift Boots',
     blurb: 'Move faster around the farm',
-    costs: [35, 80, 160],
+    costs: [50, 110, 225],
   },
   {
     id: 'fertilizer',
     name: 'Fertilizer',
     blurb: 'Crops grow and regrow faster',
-    costs: [45, 100, 200],
+    costs: [65, 140, 280],
   },
   {
     id: 'charm',
     name: 'Market Charm',
     blurb: 'Customers pay better prices',
-    costs: [50, 110, 220],
+    costs: [70, 155, 310],
   },
 ];
 
@@ -49,6 +49,6 @@ export const SOUTH_FIELD = {
   id: 'south-field',
   name: 'South Field',
   blurb: 'A fenced-off field: 48 carrot plots',
-  cost: 150,
+  cost: 210, // S5: 150 x 1.4
   rect: { x: 84, y: 1024, w: 368, h: 308 },
 };
