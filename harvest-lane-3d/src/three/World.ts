@@ -327,6 +327,9 @@ export function buildWorld(scene: THREE.Scene): void {
   const zonePaths: RectPx[] = [
     { x: 1068, y: 800, w: 532, h: 90 },
     { x: 1244, y: 140, w: 88, h: 1320 },
+    // Spur along the hotel's south fence to its gate: the visible
+    // route to the hotel door (playtest fix, 2026-11-01).
+    { x: 1244, y: 1204, w: 326, h: 40 },
   ];
   zonePaths.forEach((r) => {
     const { cx, cz, w, d } = rect3(r);

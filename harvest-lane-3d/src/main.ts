@@ -592,20 +592,30 @@ function churnStep(dtMs: number): void {
   if (!churnOwned) return;
   const dx = playerPos.x - CHURN_POS.x;
   const dz = playerPos.z - CHURN_POS.z;
-  if (dx * dx + dz * dz > 1.6 * 1.6 || backpack.countOf('milk') <= 0) {
+  // Milk can come from the backpack OR the stall stock: the churn
+  // stands right by the stall, and stocked milk was the common case
+  // players actually had (playtest fix, 2026-11-01).
+  const hasMilk = backpack.countOf('milk') > 0 || market.stockOf('milk') > 0;
+  if (dx * dx + dz * dz > 1.6 * 1.6 || !hasMilk) {
     churnTimerMs = 0;
     return;
   }
   churnTimerMs += dtMs;
   while (churnTimerMs >= 700) {
     churnTimerMs -= 700;
-    if (backpack.remove('milk', 1) <= 0) break;
-    backpack.add('cheese', 1);
+    if (backpack.countOf('milk') > 0) {
+      backpack.remove('milk', 1);
+      backpack.add('cheese', 1);
+      hud.setBag(backpack.total, backpack.capacity);
+    } else if (market.removeStock('milk', 1)) {
+      market.addStock('cheese', 1);
+    } else {
+      break;
+    }
     gainXp(XP_VALUES.churn);
-    hud.setBag(backpack.total, backpack.capacity);
     floatAt('+1 🧀', CHURN_POS.x, CHURN_POS.z, '#ffe066');
     Audio.playPickup();
-    if (backpack.countOf('milk') <= 0) break;
+    if (backpack.countOf('milk') <= 0 && market.stockOf('milk') <= 0) break;
   }
 }
 
@@ -629,6 +639,13 @@ const upgrades = new UpgradeSystem();
 let southUnlocked = false;
 let helperHired = false;
 let churnOwned = false;
+// Cheese demand follows supply (playtest fix, 2026-11-01): customers
+// order cheese only when the player owns the churn AND could fill
+// that order from cheese on hand plus milk on hand (backpack or
+// stall stock). No more unfulfillable cheese orders.
+customers.canOrderCheese = (quantity: number) =>
+  churnOwned &&
+  market.stockOf('cheese') + market.stockOf('milk') + backpack.countOf('milk') >= quantity;
 let landPacks = 0;
 let eastUnlocked = false;
 
@@ -797,7 +814,6 @@ function renderShop(): void {
           if (!market.spendCoins(CHURN_COST)) return Audio.playError();
           churnOwned = true;
           churnGroup.visible = true;
-          customers.allowCheese = true;
           saveDirty = true;
           Audio.playSuccess();
           floatAt('🧀 Cheese churn built!', CHURN_POS.x, CHURN_POS.z, '#ffe066');
@@ -1360,7 +1376,6 @@ function applySave(save: GameSave): void {
   applyCosmetics();
   helper.setActive(helperHired);
   churnGroup.visible = churnOwned;
-  customers.allowCheese = churnOwned;
   upgrades.restore(save.upgrades);
   backpack.restore(save.backpack);
   missions.restore(save.missions);

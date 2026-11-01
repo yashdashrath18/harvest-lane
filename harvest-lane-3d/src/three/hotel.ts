@@ -48,12 +48,14 @@ export function buildHotel(scene: THREE.Scene): HotelVisual {
   const cx = X(x + w / 2);
   const cz = Z(y + h / 2);
 
-  // Fenced plot with gates on the path side and under the door
-  // (playtest fix, 2026-11-01): players can walk in and stand at
-  // the door; the building itself stays solid and the door stays
-  // barriered until L10. (A west gate alone left only a narrow
-  // pocket beside the building, too tight to walk around it.)
-  g.add(fenceRect(HOTEL_PLOT, { w: [[u(125), u(185)]], s: [[u(95), u(145)]] }));
+  // Fenced plot with ONE gate, under the door on the south side
+  // (playtest fixes, 2026-11-01): players walk in and stand at the
+  // door; the building stays solid and the door stays barriered
+  // until L10. A west gate was tried and removed the same day: the
+  // building sits too close to the west fence, so that gate only
+  // opened into a narrow pocket the player could not walk out of
+  // toward the door. A dirt spur on the ground leads to this gate.
+  g.add(fenceRect(HOTEL_PLOT, { s: [[u(95), u(145)]] }));
 
   // Stone platform and the main block.
   const stone = new THREE.MeshLambertMaterial({ color: 0xb8bcc2 });

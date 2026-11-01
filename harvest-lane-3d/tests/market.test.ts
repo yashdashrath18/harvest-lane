@@ -43,6 +43,16 @@ describe('MarketSystem', () => {
     expect(market.collectPendingCash()).toBe(0);
   });
 
+  it('removeStock takes stock out without payment and refuses overdraw', () => {
+    const market = new MarketSystem();
+    market.addStock('milk', 3);
+    expect(market.removeStock('milk', 2)).toBe(true);
+    expect(market.stockOf('milk')).toBe(1);
+    expect(market.removeStock('milk', 2)).toBe(false);
+    expect(market.stockOf('milk')).toBe(1);
+    expect(market.coins).toBe(0);
+  });
+
   it('pending cash survives a snapshot round trip', () => {
     const market = new MarketSystem();
     market.addStock('egg', 3);

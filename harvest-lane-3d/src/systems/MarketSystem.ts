@@ -62,6 +62,14 @@ export class MarketSystem {
     EventBus.emit(GameEvents.StockChanged, itemId, this.stockOf(itemId));
   }
 
+  /** Removes stock without payment (the churn turning stocked milk into cheese). */
+  removeStock(itemId: string, amount: number): boolean {
+    if (amount <= 0 || this.stockOf(itemId) < amount) return false;
+    this.stock.set(itemId, this.stockOf(itemId) - amount);
+    EventBus.emit(GameEvents.StockChanged, itemId, this.stockOf(itemId));
+    return true;
+  }
+
   /**
    * Attempts to fulfil an order from stock. On success, removes the
    * stock and returns the amount earned. With `toPile` the money

@@ -53,7 +53,14 @@ export class CustomerSystem3D {
   private patternCursor = 0;
   private serveTimerMs = 0;
   allowCarrot = false;
-  allowCheese = false;
+  /**
+   * Cheese orders are offered only when this predicate says the
+   * player can actually supply that quantity (owns the churn, and
+   * has cheese or milk on hand). Playtest fix, 2026-11-01: gating on
+   * churn ownership alone left players facing cheese orders they
+   * had no way to fill.
+   */
+  canOrderCheese: (quantity: number) => boolean = () => false;
   /** Return true when the front customer's order was served. */
   onTryServe: ((order: Order) => boolean) | null = null;
   onServed: ((customerPos: { x: number; z: number }) => void) | null = null;
@@ -90,7 +97,7 @@ export class CustomerSystem3D {
       const order = ORDER_PATTERN[this.patternCursor % ORDER_PATTERN.length];
       this.patternCursor++;
       if (order.itemId === 'carrot' && !this.allowCarrot) continue;
-      if (order.itemId === 'cheese' && !this.allowCheese) continue;
+      if (order.itemId === 'cheese' && !this.canOrderCheese(order.quantity)) continue;
       return { ...order };
     }
     return { itemId: 'corn', quantity: 2 };
