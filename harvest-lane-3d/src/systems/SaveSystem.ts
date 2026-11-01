@@ -43,6 +43,8 @@ export interface GameSave {
   eastUnlocked: boolean;
   /** Animal extension tiers owned (master prompt S4). */
   animalTiers: { chicken: number; cow: number };
+  /** The Grand Hotel landmark unlocked at Level 10 (master prompt S8). */
+  hotelUnlocked: boolean;
   upgrades: Record<string, number>;
   areaUnlocked: boolean;
   missions: {
@@ -213,6 +215,7 @@ function normalizeV1(raw: Record<string, unknown>): GameSave {
     landPacks: Math.min(6, cleanInt(raw.landPacks)),
     eastUnlocked: raw.eastUnlocked === true,
     animalTiers: cleanAnimalTiers(raw.animalTiers),
+    hotelUnlocked: raw.hotelUnlocked === true,
     upgrades: numberRecord(raw.upgrades),
     areaUnlocked: raw.areaUnlocked === true,
     missions: {

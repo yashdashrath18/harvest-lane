@@ -81,7 +81,7 @@ export function fenceRun(length: number): THREE.Group {
   return g;
 }
 
-function fenceRect(r: RectPx, gaps: Partial<Record<'n' | 's' | 'e' | 'w', [number, number][]>> = {}): THREE.Group {
+export function fenceRect(r: RectPx, gaps: Partial<Record<'n' | 's' | 'e' | 'w', [number, number][]>> = {}): THREE.Group {
   const { cx, cz, w, d } = rect3(r);
   const g = new THREE.Group();
   const run = (len: number, px: number, pz: number, rotY: number) => {

@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import './ui/hud.css';
 import { buildWorld, WORLD_COLLIDERS, WORLD_MATS, addFieldVisuals } from './three/World';
 import { applyOutfit } from './three/outfits';
+import { buildHotel, type HotelVisual } from './three/hotel';
+import { HOTEL_UNLOCK_LEVEL } from './data/HotelData';
 import { BASE_ITEMS, DEFAULT_OUTFIT, OUTFIT_CATEGORIES, outfitItem, outfitItemsIn, type OutfitCategory } from './data/OutfitData';
 import { STRIP_RECTS, EAST_FIELD_RECT } from './game/Layout';
 import { LAND_PACK_COUNT, PLOTS_PER_PACK, landPackLevel, landPackPrice, EAST_FIELD } from './data/LandData';
@@ -76,6 +78,25 @@ const barricade = new THREE.Group();
   barricade.position.set(X(1068), 0, Z(845));
   scene.add(barricade);
 }
+// The Grand Hotel landmark stands in the east zone from day one,
+// barriered and signposted until Level 10 (master prompt S8).
+const hotel: HotelVisual = buildHotel(scene);
+let hotelUnlocked = false;
+function unlockHotel(animate: boolean): void {
+  if (hotelUnlocked) return;
+  hotelUnlocked = true;
+  hotel.unlock(animate);
+  if (animate) {
+    const hx = X(1450);
+    const hz = Z(1050);
+    panTo(hx, hz, 1.6);
+    floatAt('🏨 GRAND HOTEL UNLOCKED!', hx, hz - 2, '#ffd9a0');
+    bursts.spawn(hx, hz, 0xffc93c, 16, 1.4);
+    Audio.playSuccess();
+    saveDirty = true;
+  }
+}
+
 const barricadeCollider = { minX: X(1068) - 0.25, maxX: X(1068) + 0.25, minZ: Z(795), maxZ: Z(895) };
 WORLD_COLLIDERS.push(barricadeCollider);
 let barricadeRemoved = false;
@@ -241,6 +262,7 @@ function gainXp(amount: number): void {
     bursts.spawn(playerPos.x, playerPos.z, 0x6bb7ff, 14, 1.5);
     Audio.playSuccess();
     applyUpgrades();
+    if (res.level >= HOTEL_UNLOCK_LEVEL) unlockHotel(true);
   }
 }
 
@@ -1261,6 +1283,7 @@ function collectSave(): GameSave {
     seeds: seeds.snapshot(),
     landPacks,
     eastUnlocked,
+    hotelUnlocked,
     upgrades: upgrades.snapshot(),
     areaUnlocked: southUnlocked,
     missions: missions.snapshot(),
@@ -1289,6 +1312,9 @@ function applySave(save: GameSave): void {
   eastUnlocked = save.eastUnlocked;
   for (let i = 0; i < landPacks; i++) buildStrip(i, false);
   if (eastUnlocked) buildEastField(false);
+  hotelUnlocked = save.hotelUnlocked;
+  if (hotelUnlocked) hotel.unlock(false);
+  else if (progression.level >= HOTEL_UNLOCK_LEVEL) unlockHotel(true);
   animals.setTiers(save.animalTiers);
   animals.restoreFeed(save.feed);
   helperHired = save.helperHired;
@@ -1488,6 +1514,7 @@ function animate(): void {
   const dt = rawDt / steps;
   for (let s = 0; s < steps; s++) stepGame(dt, t);
   bursts.update(rawDt);
+  hotel.update(rawDt);
 
   // During a land-purchase celebration the camera glances at the
   // new land instead of following the farmer (tap cancels early).
@@ -1649,6 +1676,7 @@ if (import.meta.env.MODE !== 'release') {
     backpack,
     seeds,
     land: () => ({ packs: landPacks, east: eastUnlocked }),
+    hotel: () => ({ unlocked: hotelUnlocked }),
     missions,
     market,
     customers,

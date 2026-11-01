@@ -47,6 +47,8 @@ export function stripPlotRect(i: number): RectPx {
   return { x: s.x + 34, y: s.y + 8, w: 92, h: 184 };
 }
 export const EAST_FIELD_RECT: RectPx = { x: 1300, y: 170, w: 276, h: 460 };
+/** The Grand Hotel plot (master prompt S8): the open lawn in the east zone's south-east. */
+export const HOTEL_PLOT: RectPx = { x: 1330, y: 900, w: 240, h: 300 };
 
 export const STALL_POS = { x: 840, y: 1290 };
 export const STALL_FRONT = { x: 840, y: 1412 };
