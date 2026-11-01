@@ -103,21 +103,24 @@ export function fenceRect(r: RectPx, gaps: Partial<Record<'n' | 's' | 'e' | 'w',
   };
   // North and south edges run along x; west and east along z.
   // Every span also registers a collider; gaps stay walkable.
+  // Fence colliders are thin (0.12): with the player's 0.38 radius
+  // the old 0.3 band ate 0.53 units on each side of a fence line,
+  // which sealed narrow paths between two fences entirely.
   for (const [s, e] of spans(w, gaps.n)) {
     run(e - s, cx - w / 2 + s, cz - d / 2, 0);
-    addCollider(cx - w / 2 + (s + e) / 2, cz - d / 2, e - s, 0.3);
+    addCollider(cx - w / 2 + (s + e) / 2, cz - d / 2, e - s, 0.12);
   }
   for (const [s, e] of spans(w, gaps.s)) {
     run(e - s, cx - w / 2 + s, cz + d / 2, 0);
-    addCollider(cx - w / 2 + (s + e) / 2, cz + d / 2, e - s, 0.3);
+    addCollider(cx - w / 2 + (s + e) / 2, cz + d / 2, e - s, 0.12);
   }
   for (const [s, e] of spans(d, gaps.w)) {
     run(e - s, cx - w / 2, cz - d / 2 + s, -Math.PI / 2);
-    addCollider(cx - w / 2, cz - d / 2 + (s + e) / 2, 0.3, e - s);
+    addCollider(cx - w / 2, cz - d / 2 + (s + e) / 2, 0.12, e - s);
   }
   for (const [s, e] of spans(d, gaps.e)) {
     run(e - s, cx + w / 2, cz - d / 2 + s, -Math.PI / 2);
-    addCollider(cx + w / 2, cz - d / 2 + (s + e) / 2, 0.3, e - s);
+    addCollider(cx + w / 2, cz - d / 2 + (s + e) / 2, 0.12, e - s);
   }
   return g;
 }
@@ -323,7 +326,7 @@ export function buildWorld(scene: THREE.Scene): void {
   scene.add(grass2);
   const zonePaths: RectPx[] = [
     { x: 1068, y: 800, w: 532, h: 90 },
-    { x: 1256, y: 140, w: 44, h: 1320 },
+    { x: 1244, y: 140, w: 88, h: 1320 },
   ];
   zonePaths.forEach((r) => {
     const { cx, cz, w, d } = rect3(r);

@@ -18,13 +18,13 @@ interface Crop {
 const CELL = 46;
 
 /** Plots inside a field rect, on the same 46px grid as the 2D game. */
-function plotPositions(field: RectPx): { x: number; y: number }[] {
-  const cols = Math.floor(field.w / CELL);
-  const rows = Math.floor(field.h / CELL);
+function plotPositions(field: RectPx, cell: number = CELL): { x: number; y: number }[] {
+  const cols = Math.floor(field.w / cell);
+  const rows = Math.floor(field.h / cell);
   const out: { x: number; y: number }[] = [];
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      out.push({ x: field.x + CELL / 2 + c * CELL, y: field.y + CELL / 2 + r * CELL });
+      out.push({ x: field.x + cell / 2 + c * cell, y: field.y + cell / 2 + r * cell });
     }
   }
   return out;
@@ -73,8 +73,8 @@ export class CropField3D {
   }
 
   /** Plants a bought East Strip (8 corn plots) or the East Field (60 corn). */
-  private plantRect(scene: THREE.Scene, rect: RectPx, cropId: string, phaseSeed: number): void {
-    plotPositions(rect).forEach((p, i) => {
+  private plantRect(scene: THREE.Scene, rect: RectPx, cropId: string, phaseSeed: number, cell: number = CELL): void {
+    plotPositions(rect, cell).forEach((p, i) => {
       const def = CROPS[cropId];
       const mesh = new THREE.Mesh(CROP_GEOMETRIES[cropId][0], CROP_MATERIAL);
       mesh.position.set(X(p.x), 0, Z(p.y));
@@ -93,7 +93,11 @@ export class CropField3D {
   }
 
   plantStrip(scene: THREE.Scene, index: number): void {
-    this.plantRect(scene, stripPlotRect(index), 'corn', 10 + index);
+    const rect = stripPlotRect(index);
+    // Every strip holds 8 plots (2 cols x 4 rows): the shorter
+    // southern strips use a tighter cell so the row count survives.
+    const cell = Math.floor(rect.h / 4);
+    this.plantRect(scene, rect, 'corn', 10 + index, cell);
   }
 
   plantEast(scene: THREE.Scene): void {

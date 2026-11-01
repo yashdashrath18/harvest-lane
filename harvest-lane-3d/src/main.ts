@@ -646,7 +646,11 @@ renderer.domElement.addEventListener('pointerdown', () => {
 
 /** Builds one East Strip: fence, soil, plots, and (on purchase) the party. */
 function buildStrip(index: number, celebrate: boolean): void {
-  addFieldVisuals(scene, STRIP_RECTS[index], { w: [[u(62), u(138)]] });
+  // Gates on BOTH short sides (playtest fix, 2026-11-01): the east
+  // gate opens onto the zone's north-south path, which is how the
+  // player actually reaches each strip; a west gate alone opened
+  // into the narrow strip between the fences.
+  addFieldVisuals(scene, STRIP_RECTS[index], { w: [[u(62), u(138)]], e: [[u(62), u(138)]] });
   cropField.plantStrip(scene, index);
   if (celebrate) {
     const c = STRIP_RECTS[index];

@@ -18,7 +18,7 @@ const GATE_PX: Record<string, { x: number; y: number }> = {
   B: { x: 452, y: 673 },
   CORN: { x: 628, y: 364 },
   SOUTH: { x: 452, y: 1178 },
-  EAST: { x: 1300, y: 400 },
+  EAST: { x: 1332, y: 400 },
 };
 STRIP_RECTS.forEach((s, i) => {
   GATE_PX[`S${i}`] = { x: s.x, y: s.y + 100 };
